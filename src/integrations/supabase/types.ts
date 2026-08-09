@@ -14,7 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      territories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          path: Json
+          status: Database["public"]["Enums"]["territory_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          path: Json
+          status?: Database["public"]["Enums"]["territory_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          path?: Json
+          status?: Database["public"]["Enums"]["territory_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +55,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      territory_status: "pendente" | "andamento" | "concluido"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +182,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      territory_status: ["pendente", "andamento", "concluido"],
+    },
   },
 } as const
