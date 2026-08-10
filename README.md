@@ -1,14 +1,18 @@
-# Welcome to your Lovable project
+# Map My Regions
+
+Quero criar um site para eu utilizar pra mapear regiões no google maps em que eu já dominei, tipo um bairro eu seleciono ele e ele ficar marcado como se eu tivesse visto todas as lojas da região, quero monitorar igual no google maps
 
 This project was built with [Lovable](https://lovable.dev).
 
+**Live app**: https://map-my-conquests.lovable.app
+
 ## Build with Lovable
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+Continue developing this project in the [Lovable editor](https://lovable.dev/projects/9713ac3b-7086-4e55-88a5-b49382aaf38f).
 
 - **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+- **Stay in sync**: every change made in Lovable is committed straight to this repository.
+- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
 
 ## Development
 
@@ -20,10 +24,3 @@ cd <repository-name>
 npm i
 npm run dev
 ```
-
-## Built with
-
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
