@@ -24,7 +24,7 @@ export function loadGoogleMaps(): Promise<typeof google.maps> {
     const script = document.createElement("script");
     script.src =
       `https://maps.googleapis.com/maps/api/js?key=${key}` +
-      `&loading=async&libraries=drawing,geometry&language=pt-BR&region=BR` +
+      `&loading=async&libraries=geometry&language=pt-BR&region=BR` +
       `&callback=${callbackName}` +
       (channel ? `&channel=${channel}` : "");
     script.async = true;
