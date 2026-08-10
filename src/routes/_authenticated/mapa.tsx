@@ -36,6 +36,8 @@ function MapaPage() {
   const runSearch = useServerFn(searchArea);
 
   const [drawing, setDrawing] = useState(false);
+  const [draftPoints, setDraftPoints] = useState(0);
+  const [finishSignal, setFinishSignal] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeocodeResult[]>([]);
@@ -204,11 +206,32 @@ function MapaPage() {
           <Button
             variant={drawing ? "default" : "outline"}
             className="w-full"
-            onClick={() => setDrawing((d) => !d)}
+            onClick={() => {
+              setSelectedId(null);
+              setDrawing((d) => !d);
+            }}
           >
             <PencilRuler className="mr-2 h-4 w-4" />
-            {drawing ? "Desenhando… clique no mapa" : "Desenhar área"}
+            {drawing ? "Cancelar desenho" : "Desenhar área"}
           </Button>
+
+          {drawing && (
+            <div className="space-y-2 rounded-lg bg-sidebar-accent px-3 py-3 text-xs">
+              <p className="opacity-80">
+                Clique no mapa para marcar os cantos da região ({draftPoints} ponto
+                {draftPoints === 1 ? "" : "s"}). Dê dois cliques ou use o botão abaixo para fechar
+                a área.
+              </p>
+              <Button
+                size="sm"
+                className="w-full"
+                disabled={draftPoints < 3}
+                onClick={() => setFinishSignal((n) => n + 1)}
+              >
+                Concluir área
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto border-t border-sidebar-border px-5 py-4">
@@ -248,8 +271,11 @@ function MapaPage() {
               selectedId={selectedId}
               focus={focus}
               onSelect={setSelectedId}
+              onDraftChange={setDraftPoints}
+              finishSignal={finishSignal}
               onPolygonComplete={(path) => {
                 setDrawing(false);
+                setDraftPoints(0);
                 createTerritory.mutate({ name: `Área ${territories.length + 1}`, path });
               }}
               onPathEdited={(id, path) => updateTerritory.mutate({ id, values: { path } })}

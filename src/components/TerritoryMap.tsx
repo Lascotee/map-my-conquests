@@ -1,14 +1,8 @@
 import { useEffect, useRef } from "react";
 import { loadGoogleMaps, STATUS_META, type LatLngLiteral, type Territory } from "@/lib/maps";
 
-// The bundled @types/google.maps ships an empty DrawingManager stub.
-type DrawingManagerLike = {
-  setMap: (map: google.maps.Map | null) => void;
-  setDrawingMode: (mode: unknown) => void;
-  addListener: (event: string, handler: (poly: google.maps.Polygon) => void) => void;
-};
-type DrawingManagerCtor = new (opts: Record<string, unknown>) => DrawingManagerLike;
-
+const DEFAULT_CENTER: LatLngLiteral = { lat: -27.5954, lng: -48.548 }; // Florianópolis
+const VIEW_KEY = "territorios:view";
 
 type Props = {
   territories: Territory[];
@@ -18,6 +12,8 @@ type Props = {
   onPolygonComplete: (path: LatLngLiteral[]) => void;
   onSelect: (id: string) => void;
   onPathEdited: (id: string, path: LatLngLiteral[]) => void;
+  onDraftChange?: (points: number) => void;
+  finishSignal?: number;
 };
 
 export default function TerritoryMap({
@@ -28,51 +24,129 @@ export default function TerritoryMap({
   onPolygonComplete,
   onSelect,
   onPathEdited,
+  onDraftChange,
+  finishSignal = 0,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
-  const managerRef = useRef<DrawingManagerLike | null>(null);
   const shapesRef = useRef<Map<string, google.maps.Polygon>>(new Map());
-  const handlersRef = useRef({ onPolygonComplete, onSelect, onPathEdited });
-  handlersRef.current = { onPolygonComplete, onSelect, onPathEdited };
+  const draftRef = useRef<LatLngLiteral[]>([]);
+  const draftShapeRef = useRef<google.maps.Polygon | null>(null);
+  const draftMarkersRef = useRef<google.maps.Marker[]>([]);
+  const drawingRef = useRef(drawing);
+  drawingRef.current = drawing;
+  const handlersRef = useRef({ onPolygonComplete, onSelect, onPathEdited, onDraftChange });
+  handlersRef.current = { onPolygonComplete, onSelect, onPathEdited, onDraftChange };
+
+  function clearDraft() {
+    draftRef.current = [];
+    draftShapeRef.current?.setMap(null);
+    draftShapeRef.current = null;
+    for (const m of draftMarkersRef.current) m.setMap(null);
+    draftMarkersRef.current = [];
+    handlersRef.current.onDraftChange?.(0);
+  }
+
+  function renderDraft() {
+    const map = mapRef.current;
+    if (!map || !window.google) return;
+    const maps = window.google.maps;
+    const color = STATUS_META.pendente.color;
+    if (!draftShapeRef.current) {
+      draftShapeRef.current = new maps.Polygon({
+        map,
+        fillColor: color,
+        strokeColor: color,
+        fillOpacity: 0.25,
+        strokeWeight: 2,
+        clickable: false,
+        zIndex: 20,
+      });
+    }
+    draftShapeRef.current.setPath(draftRef.current);
+
+    for (const m of draftMarkersRef.current) m.setMap(null);
+    draftMarkersRef.current = draftRef.current.map(
+      (p) =>
+        new maps.Marker({
+          position: p,
+          map,
+          clickable: false,
+          icon: {
+            path: maps.SymbolPath.CIRCLE,
+            scale: 5,
+            fillColor: color,
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 2,
+          },
+        }),
+    );
+    handlersRef.current.onDraftChange?.(draftRef.current.length);
+  }
+
+  function finishDraft() {
+    if (draftRef.current.length < 3) {
+      clearDraft();
+      return;
+    }
+    const path = draftRef.current.slice();
+    clearDraft();
+    handlersRef.current.onPolygonComplete(path);
+  }
 
   useEffect(() => {
     let cancelled = false;
     void loadGoogleMaps().then((maps) => {
       if (cancelled || !containerRef.current || mapRef.current) return;
+
+      let center = DEFAULT_CENTER;
+      let zoom = 13;
+      try {
+        const saved = window.localStorage.getItem(VIEW_KEY);
+        if (saved) {
+          const v = JSON.parse(saved) as { lat: number; lng: number; zoom: number };
+          if (Number.isFinite(v.lat) && Number.isFinite(v.lng)) {
+            center = { lat: v.lat, lng: v.lng };
+            zoom = v.zoom ?? 13;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+
       const map = new maps.Map(containerRef.current, {
-        center: { lat: -23.5505, lng: -46.6333 },
-        zoom: 13,
+        center,
+        zoom,
         streetViewControl: false,
         mapTypeControl: true,
         fullscreenControl: false,
         clickableIcons: false,
+        disableDoubleClickZoom: true,
       });
       mapRef.current = map;
 
-      const Manager = maps.drawing.DrawingManager as unknown as DrawingManagerCtor;
-      const manager = new Manager({
-
-        drawingMode: null,
-        drawingControl: false,
-        polygonOptions: {
-          fillColor: STATUS_META.pendente.color,
-          fillOpacity: 0.3,
-          strokeColor: STATUS_META.pendente.color,
-          strokeWeight: 2,
-        },
+      map.addListener("idle", () => {
+        const c = map.getCenter();
+        if (!c) return;
+        try {
+          window.localStorage.setItem(
+            VIEW_KEY,
+            JSON.stringify({ lat: c.lat(), lng: c.lng(), zoom: map.getZoom() ?? 13 }),
+          );
+        } catch {
+          /* ignore */
+        }
       });
-      manager.setMap(map);
-      managerRef.current = manager;
 
-      manager.addListener("polygoncomplete", (poly: google.maps.Polygon) => {
-        const path = poly
-          .getPath()
-          .getArray()
-          .map((p) => ({ lat: p.lat(), lng: p.lng() }));
-        poly.setMap(null);
-        manager.setDrawingMode(null);
-        handlersRef.current.onPolygonComplete(path);
+      map.addListener("click", (e: google.maps.MapMouseEvent) => {
+        if (!drawingRef.current || !e.latLng) return;
+        draftRef.current = [...draftRef.current, { lat: e.latLng.lat(), lng: e.latLng.lng() }];
+        renderDraft();
+      });
+
+      map.addListener("dblclick", () => {
+        if (drawingRef.current) finishDraft();
       });
     });
     return () => {
@@ -81,17 +155,20 @@ export default function TerritoryMap({
   }, []);
 
   useEffect(() => {
-    const manager = managerRef.current;
-    if (!manager || !window.google) return;
-    manager.setDrawingMode(drawing ? window.google.maps.drawing.OverlayType.POLYGON : null);
+    if (!drawing) clearDraft();
   }, [drawing]);
 
   useEffect(() => {
+    if (finishSignal > 0) finishDraft();
+  }, [finishSignal]);
+
+  useEffect(() => {
     const map = mapRef.current;
-    if (!map || !window.google) return;
+    if (!map || !window.google?.maps?.Polygon) return;
     const maps = window.google.maps;
     const shapes = shapesRef.current;
     const seen = new Set<string>();
+    try {
 
     for (const t of territories) {
       seen.add(t.id);
@@ -122,18 +199,22 @@ export default function TerritoryMap({
         strokeColor: color,
         fillOpacity: isSelected ? 0.55 : 0.32,
         strokeWeight: isSelected ? 4 : 2,
-        editable: isSelected,
+        editable: isSelected && !drawing,
+        clickable: !drawing,
         zIndex: isSelected ? 10 : 1,
       });
     }
 
-    for (const [id, poly] of shapes) {
-      if (!seen.has(id)) {
-        poly.setMap(null);
-        shapes.delete(id);
+      for (const [id, poly] of shapes) {
+        if (!seen.has(id)) {
+          poly.setMap(null);
+          shapes.delete(id);
+        }
       }
+    } catch (err) {
+      console.error("Falha ao desenhar regiões no mapa", err);
     }
-  }, [territories, selectedId]);
+  }, [territories, selectedId, drawing]);
 
   useEffect(() => {
     const map = mapRef.current;
