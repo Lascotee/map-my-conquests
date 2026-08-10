@@ -35,6 +35,7 @@ function MapaPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const runSearch = useServerFn(searchArea);
+  const runPlaces = useServerFn(searchAestheticPlaces);
 
   const [drawing, setDrawing] = useState(false);
   const [draftPoints, setDraftPoints] = useState(0);
@@ -44,6 +45,11 @@ function MapaPage() {
   const [results, setResults] = useState<GeocodeResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [focus, setFocus] = useState<{ bounds: GeocodeResult["bounds"] } | null>(null);
+  const [places, setPlaces] = useState<PlaceResult[]>([]);
+  const [placeAreaName, setPlaceAreaName] = useState("");
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [loadingPlaces, setLoadingPlaces] = useState(false);
+
 
   const { data: territories = [] } = useQuery({
     queryKey: ["territories"],
