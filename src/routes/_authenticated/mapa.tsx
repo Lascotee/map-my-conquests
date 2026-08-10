@@ -36,6 +36,8 @@ function MapaPage() {
   const runSearch = useServerFn(searchArea);
 
   const [drawing, setDrawing] = useState(false);
+  const [draftPoints, setDraftPoints] = useState(0);
+  const [finishSignal, setFinishSignal] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeocodeResult[]>([]);
