@@ -45,8 +45,8 @@ export default function TerritoryMap({
   const draftMarkersRef = useRef<google.maps.Marker[]>([]);
   const drawingRef = useRef(drawing);
   drawingRef.current = drawing;
-  const handlersRef = useRef({ onPolygonComplete, onSelect, onPathEdited, onDraftChange });
-  handlersRef.current = { onPolygonComplete, onSelect, onPathEdited, onDraftChange };
+  const handlersRef = useRef({ onPolygonComplete, onSelect, onPathEdited, onDraftChange, onSelectPlace });
+  handlersRef.current = { onPolygonComplete, onSelect, onPathEdited, onDraftChange, onSelectPlace };
 
   function clearDraft() {
     draftRef.current = [];
