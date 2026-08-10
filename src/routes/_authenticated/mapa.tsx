@@ -4,10 +4,11 @@ import { ClientOnly } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { LogOut, PencilRuler, Search, Trash2, X } from "lucide-react";
+import { LogOut, PencilRuler, Search, Sparkles, Star, Trash2, X } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { searchArea, type GeocodeResult } from "@/lib/geocode.functions";
+import { searchAestheticPlaces, type PlaceResult } from "@/lib/places.functions";
 import { STATUS_META, type LatLngLiteral, type Territory, type TerritoryStatus } from "@/lib/maps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
