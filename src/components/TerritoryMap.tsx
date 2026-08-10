@@ -164,10 +164,11 @@ export default function TerritoryMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !window.google) return;
+    if (!map || !window.google?.maps?.Polygon) return;
     const maps = window.google.maps;
     const shapes = shapesRef.current;
     const seen = new Set<string>();
+    try {
 
     for (const t of territories) {
       seen.add(t.id);
