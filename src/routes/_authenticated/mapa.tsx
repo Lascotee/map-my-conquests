@@ -439,6 +439,16 @@ function MapaPage() {
               </div>
 
               <Button
+                variant="outline"
+                className="w-full"
+                disabled={loadingPlaces || !selectedBounds}
+                onClick={() => selectedBounds && void findPlaces(selectedBounds, selected.name)}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                {loadingPlaces ? "Buscando…" : "Buscar comércios de estética"}
+              </Button>
+
+              <Button
                 variant="ghost"
                 className="w-full text-destructive hover:text-destructive"
                 onClick={() => deleteTerritory.mutate(selected.id)}
