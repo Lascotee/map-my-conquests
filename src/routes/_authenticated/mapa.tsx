@@ -142,11 +142,40 @@ function MapaPage() {
     setQuery("");
   }
 
+  async function findPlaces(bounds: GeocodeResult["bounds"], areaName: string) {
+    setLoadingPlaces(true);
+    setSelectedPlaceId(null);
+    setFocus({ bounds });
+    try {
+      const found = await runPlaces({ data: { bounds } });
+      setPlaces(found);
+      setPlaceAreaName(areaName);
+      toast[found.length ? "success" : "info"](
+        found.length
+          ? `${found.length} comércios de estética encontrados`
+          : "Nenhum comércio de estética encontrado nessa área",
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Busca de comércios indisponível");
+    } finally {
+      setLoadingPlaces(false);
+    }
+  }
+
   const selected = territories.find((t) => t.id === selectedId) ?? null;
+  const selectedBounds = selected
+    ? {
+        north: Math.max(...selected.path.map((p) => p.lat)),
+        south: Math.min(...selected.path.map((p) => p.lat)),
+        east: Math.max(...selected.path.map((p) => p.lng)),
+        west: Math.min(...selected.path.map((p) => p.lng)),
+      }
+    : null;
   const counts = STATUS_ORDER.map((s) => ({
     status: s,
     total: territories.filter((t) => t.status === s).length,
   }));
+
 
   return (
     <div className="flex h-screen flex-col bg-background lg:flex-row">
