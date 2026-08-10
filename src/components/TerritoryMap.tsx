@@ -228,6 +228,75 @@ export default function TerritoryMap({
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || !window.google?.maps?.Marker) return;
+    const maps = window.google.maps;
+    const markers = placeMarkersRef.current;
+    const seen = new Set<string>();
+
+    for (const p of places) {
+      seen.add(p.id);
+      let marker = markers.get(p.id);
+      if (!marker) {
+        marker = new maps.Marker({
+          position: p.location,
+          map,
+          title: p.name,
+        });
+        marker.addListener("click", () => handlersRef.current.onSelectPlace?.(p.id));
+        markers.set(p.id, marker);
+      }
+      const isSel = p.id === selectedPlaceId;
+      marker.setIcon({
+        path: maps.SymbolPath.CIRCLE,
+        scale: isSel ? 9 : 6,
+        fillColor: PLACE_COLOR,
+        fillOpacity: 1,
+        strokeColor: "#ffffff",
+        strokeWeight: 2,
+      });
+      marker.setZIndex(isSel ? 100 : 50);
+    }
+
+    for (const [id, marker] of markers) {
+      if (!seen.has(id)) {
+        marker.setMap(null);
+        markers.delete(id);
+      }
+    }
+  }, [places, selectedPlaceId]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !window.google) return;
+    const place = places.find((p) => p.id === selectedPlaceId);
+    if (!place) {
+      infoRef.current?.close();
+      return;
+    }
+    if (!infoRef.current) infoRef.current = new window.google.maps.InfoWindow();
+    const div = document.createElement("div");
+    div.style.maxWidth = "220px";
+    div.style.fontFamily = "inherit";
+    const title = document.createElement("strong");
+    title.textContent = place.name;
+    const addr = document.createElement("div");
+    addr.style.fontSize = "12px";
+    addr.textContent = place.address;
+    div.append(title, addr);
+    if (place.rating) {
+      const r = document.createElement("div");
+      r.style.fontSize = "12px";
+      r.textContent = `★ ${place.rating.toFixed(1)} (${place.reviews ?? 0})`;
+      div.append(r);
+    }
+    infoRef.current.setContent(div);
+    infoRef.current.setPosition(place.location);
+    infoRef.current.open({ map });
+    map.panTo(place.location);
+  }, [selectedPlaceId, places]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map || !focus || !window.google) return;
     const b = focus.bounds;
     map.fitBounds(
