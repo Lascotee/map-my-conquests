@@ -281,6 +281,54 @@ function MapaPage() {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto border-t border-sidebar-border px-5 py-4">
+          {loadingPlaces && (
+            <p className="mb-3 text-sm opacity-70">Procurando clínicas e comércios de estética…</p>
+          )}
+
+          {places.length > 0 && (
+            <div className="mb-5">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide opacity-70">
+                  Estética em {placeAreaName} ({places.length})
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Limpar comércios"
+                  onClick={() => {
+                    setPlaces([]);
+                    setSelectedPlaceId(null);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <ul className="space-y-2">
+                {places.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      onClick={() => setSelectedPlaceId(p.id)}
+                      className={`w-full rounded-lg px-3 py-2.5 text-left text-sm ${
+                        p.id === selectedPlaceId
+                          ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                          : "bg-sidebar-accent"
+                      }`}
+                    >
+                      <span className="block truncate font-medium">{p.name}</span>
+                      <span className="block truncate text-xs opacity-70">{p.address}</span>
+                      {p.rating !== null && (
+                        <span className="mt-1 flex items-center gap-1 text-xs opacity-80">
+                          <Star className="h-3 w-3" />
+                          {p.rating.toFixed(1)} · {p.reviews ?? 0} avaliações
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {territories.length === 0 ? (
             <p className="text-sm opacity-70">
               Nenhuma região ainda. Busque um bairro ou desenhe a área no mapa.
@@ -316,9 +364,13 @@ function MapaPage() {
               drawing={drawing}
               selectedId={selectedId}
               focus={focus}
+              places={places}
+              selectedPlaceId={selectedPlaceId}
+              onSelectPlace={setSelectedPlaceId}
               onSelect={setSelectedId}
               onDraftChange={setDraftPoints}
               finishSignal={finishSignal}
+
               onPolygonComplete={(path) => {
                 setDrawing(false);
                 setDraftPoints(0);
