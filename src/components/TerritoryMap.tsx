@@ -1,14 +1,19 @@
 import { useEffect, useRef } from "react";
 import { loadGoogleMaps, STATUS_META, type LatLngLiteral, type Territory } from "@/lib/maps";
+import type { PlaceResult } from "@/lib/places.functions";
 
 const DEFAULT_CENTER: LatLngLiteral = { lat: -27.5954, lng: -48.548 }; // Florianópolis
 const VIEW_KEY = "territorios:view";
+const PLACE_COLOR = "#7c3aed";
 
 type Props = {
   territories: Territory[];
   drawing: boolean;
   selectedId: string | null;
   focus: { bounds: { north: number; south: number; east: number; west: number } } | null;
+  places?: PlaceResult[];
+  selectedPlaceId?: string | null;
+  onSelectPlace?: (id: string) => void;
   onPolygonComplete: (path: LatLngLiteral[]) => void;
   onSelect: (id: string) => void;
   onPathEdited: (id: string, path: LatLngLiteral[]) => void;
@@ -21,6 +26,9 @@ export default function TerritoryMap({
   drawing,
   selectedId,
   focus,
+  places = [],
+  selectedPlaceId = null,
+  onSelectPlace,
   onPolygonComplete,
   onSelect,
   onPathEdited,
@@ -30,6 +38,8 @@ export default function TerritoryMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const shapesRef = useRef<Map<string, google.maps.Polygon>>(new Map());
+  const placeMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+  const infoRef = useRef<google.maps.InfoWindow | null>(null);
   const draftRef = useRef<LatLngLiteral[]>([]);
   const draftShapeRef = useRef<google.maps.Polygon | null>(null);
   const draftMarkersRef = useRef<google.maps.Marker[]>([]);
