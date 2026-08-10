@@ -271,8 +271,11 @@ function MapaPage() {
               selectedId={selectedId}
               focus={focus}
               onSelect={setSelectedId}
+              onDraftChange={setDraftPoints}
+              finishSignal={finishSignal}
               onPolygonComplete={(path) => {
                 setDrawing(false);
+                setDraftPoints(0);
                 createTerritory.mutate({ name: `Área ${territories.length + 1}`, path });
               }}
               onPathEdited={(id, path) => updateTerritory.mutate({ id, values: { path } })}
