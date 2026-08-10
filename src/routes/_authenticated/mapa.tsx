@@ -4,10 +4,11 @@ import { ClientOnly } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { LogOut, PencilRuler, Search, Trash2, X } from "lucide-react";
+import { LogOut, PencilRuler, Search, Sparkles, Star, Trash2, X } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { searchArea, type GeocodeResult } from "@/lib/geocode.functions";
+import { searchAestheticPlaces, type PlaceResult } from "@/lib/places.functions";
 import { STATUS_META, type LatLngLiteral, type Territory, type TerritoryStatus } from "@/lib/maps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,7 @@ function MapaPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const runSearch = useServerFn(searchArea);
+  const runPlaces = useServerFn(searchAestheticPlaces);
 
   const [drawing, setDrawing] = useState(false);
   const [draftPoints, setDraftPoints] = useState(0);
@@ -43,6 +45,11 @@ function MapaPage() {
   const [results, setResults] = useState<GeocodeResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [focus, setFocus] = useState<{ bounds: GeocodeResult["bounds"] } | null>(null);
+  const [places, setPlaces] = useState<PlaceResult[]>([]);
+  const [placeAreaName, setPlaceAreaName] = useState("");
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [loadingPlaces, setLoadingPlaces] = useState(false);
+
 
   const { data: territories = [] } = useQuery({
     queryKey: ["territories"],
@@ -135,11 +142,40 @@ function MapaPage() {
     setQuery("");
   }
 
+  async function findPlaces(bounds: GeocodeResult["bounds"], areaName: string) {
+    setLoadingPlaces(true);
+    setSelectedPlaceId(null);
+    setFocus({ bounds });
+    try {
+      const found = await runPlaces({ data: { bounds } });
+      setPlaces(found);
+      setPlaceAreaName(areaName);
+      toast[found.length ? "success" : "info"](
+        found.length
+          ? `${found.length} comércios de estética encontrados`
+          : "Nenhum comércio de estética encontrado nessa área",
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Busca de comércios indisponível");
+    } finally {
+      setLoadingPlaces(false);
+    }
+  }
+
   const selected = territories.find((t) => t.id === selectedId) ?? null;
+  const selectedBounds = selected
+    ? {
+        north: Math.max(...selected.path.map((p) => p.lat)),
+        south: Math.min(...selected.path.map((p) => p.lat)),
+        east: Math.max(...selected.path.map((p) => p.lng)),
+        west: Math.min(...selected.path.map((p) => p.lng)),
+      }
+    : null;
   const counts = STATUS_ORDER.map((s) => ({
     status: s,
     total: territories.filter((t) => t.status === s).length,
   }));
+
 
   return (
     <div className="flex h-screen flex-col bg-background lg:flex-row">
@@ -191,17 +227,27 @@ function MapaPage() {
           {results.length > 0 && (
             <ul className="space-y-1">
               {results.map((r) => (
-                <li key={r.name}>
-                  <button
-                    onClick={() => addFromResult(r)}
-                    className="w-full rounded-lg bg-sidebar-accent px-3 py-2 text-left text-sm hover:opacity-90"
-                  >
-                    {r.name}
-                  </button>
+                <li key={r.name} className="rounded-lg bg-sidebar-accent px-3 py-2">
+                  <p className="text-sm">{r.name}</p>
+                  <div className="mt-2 flex gap-2">
+                    <Button
+                      size="sm"
+                      className="flex-1"
+                      disabled={loadingPlaces}
+                      onClick={() => void findPlaces(r.bounds, r.name.split(",")[0] ?? r.name)}
+                    >
+                      <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                      Comércios
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => addFromResult(r)}>
+                      Salvar região
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
+
 
           <Button
             variant={drawing ? "default" : "outline"}
@@ -235,6 +281,54 @@ function MapaPage() {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto border-t border-sidebar-border px-5 py-4">
+          {loadingPlaces && (
+            <p className="mb-3 text-sm opacity-70">Procurando clínicas e comércios de estética…</p>
+          )}
+
+          {places.length > 0 && (
+            <div className="mb-5">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide opacity-70">
+                  Estética em {placeAreaName} ({places.length})
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Limpar comércios"
+                  onClick={() => {
+                    setPlaces([]);
+                    setSelectedPlaceId(null);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <ul className="space-y-2">
+                {places.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      onClick={() => setSelectedPlaceId(p.id)}
+                      className={`w-full rounded-lg px-3 py-2.5 text-left text-sm ${
+                        p.id === selectedPlaceId
+                          ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                          : "bg-sidebar-accent"
+                      }`}
+                    >
+                      <span className="block truncate font-medium">{p.name}</span>
+                      <span className="block truncate text-xs opacity-70">{p.address}</span>
+                      {p.rating !== null && (
+                        <span className="mt-1 flex items-center gap-1 text-xs opacity-80">
+                          <Star className="h-3 w-3" />
+                          {p.rating.toFixed(1)} · {p.reviews ?? 0} avaliações
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {territories.length === 0 ? (
             <p className="text-sm opacity-70">
               Nenhuma região ainda. Busque um bairro ou desenhe a área no mapa.
@@ -270,9 +364,13 @@ function MapaPage() {
               drawing={drawing}
               selectedId={selectedId}
               focus={focus}
+              places={places}
+              selectedPlaceId={selectedPlaceId}
+              onSelectPlace={setSelectedPlaceId}
               onSelect={setSelectedId}
               onDraftChange={setDraftPoints}
               finishSignal={finishSignal}
+
               onPolygonComplete={(path) => {
                 setDrawing(false);
                 setDraftPoints(0);
@@ -339,6 +437,16 @@ function MapaPage() {
                   }
                 />
               </div>
+
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={loadingPlaces || !selectedBounds}
+                onClick={() => selectedBounds && void findPlaces(selectedBounds, selected.name)}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                {loadingPlaces ? "Buscando…" : "Buscar comércios de estética"}
+              </Button>
 
               <Button
                 variant="ghost"

@@ -1,14 +1,19 @@
 import { useEffect, useRef } from "react";
 import { loadGoogleMaps, STATUS_META, type LatLngLiteral, type Territory } from "@/lib/maps";
+import type { PlaceResult } from "@/lib/places.functions";
 
 const DEFAULT_CENTER: LatLngLiteral = { lat: -27.5954, lng: -48.548 }; // Florianópolis
 const VIEW_KEY = "territorios:view";
+const PLACE_COLOR = "#7c3aed";
 
 type Props = {
   territories: Territory[];
   drawing: boolean;
   selectedId: string | null;
   focus: { bounds: { north: number; south: number; east: number; west: number } } | null;
+  places?: PlaceResult[];
+  selectedPlaceId?: string | null;
+  onSelectPlace?: (id: string) => void;
   onPolygonComplete: (path: LatLngLiteral[]) => void;
   onSelect: (id: string) => void;
   onPathEdited: (id: string, path: LatLngLiteral[]) => void;
@@ -21,6 +26,9 @@ export default function TerritoryMap({
   drawing,
   selectedId,
   focus,
+  places = [],
+  selectedPlaceId = null,
+  onSelectPlace,
   onPolygonComplete,
   onSelect,
   onPathEdited,
@@ -30,13 +38,15 @@ export default function TerritoryMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const shapesRef = useRef<Map<string, google.maps.Polygon>>(new Map());
+  const placeMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+  const infoRef = useRef<google.maps.InfoWindow | null>(null);
   const draftRef = useRef<LatLngLiteral[]>([]);
   const draftShapeRef = useRef<google.maps.Polygon | null>(null);
   const draftMarkersRef = useRef<google.maps.Marker[]>([]);
   const drawingRef = useRef(drawing);
   drawingRef.current = drawing;
-  const handlersRef = useRef({ onPolygonComplete, onSelect, onPathEdited, onDraftChange });
-  handlersRef.current = { onPolygonComplete, onSelect, onPathEdited, onDraftChange };
+  const handlersRef = useRef({ onPolygonComplete, onSelect, onPathEdited, onDraftChange, onSelectPlace });
+  handlersRef.current = { onPolygonComplete, onSelect, onPathEdited, onDraftChange, onSelectPlace };
 
   function clearDraft() {
     draftRef.current = [];
@@ -215,6 +225,75 @@ export default function TerritoryMap({
       console.error("Falha ao desenhar regiões no mapa", err);
     }
   }, [territories, selectedId, drawing]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !window.google?.maps?.Marker) return;
+    const maps = window.google.maps;
+    const markers = placeMarkersRef.current;
+    const seen = new Set<string>();
+
+    for (const p of places) {
+      seen.add(p.id);
+      let marker = markers.get(p.id);
+      if (!marker) {
+        marker = new maps.Marker({
+          position: p.location,
+          map,
+          title: p.name,
+        });
+        marker.addListener("click", () => handlersRef.current.onSelectPlace?.(p.id));
+        markers.set(p.id, marker);
+      }
+      const isSel = p.id === selectedPlaceId;
+      marker.setIcon({
+        path: maps.SymbolPath.CIRCLE,
+        scale: isSel ? 9 : 6,
+        fillColor: PLACE_COLOR,
+        fillOpacity: 1,
+        strokeColor: "#ffffff",
+        strokeWeight: 2,
+      });
+      marker.setZIndex(isSel ? 100 : 50);
+    }
+
+    for (const [id, marker] of markers) {
+      if (!seen.has(id)) {
+        marker.setMap(null);
+        markers.delete(id);
+      }
+    }
+  }, [places, selectedPlaceId]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !window.google) return;
+    const place = places.find((p) => p.id === selectedPlaceId);
+    if (!place) {
+      infoRef.current?.close();
+      return;
+    }
+    if (!infoRef.current) infoRef.current = new window.google.maps.InfoWindow();
+    const div = document.createElement("div");
+    div.style.maxWidth = "220px";
+    div.style.fontFamily = "inherit";
+    const title = document.createElement("strong");
+    title.textContent = place.name;
+    const addr = document.createElement("div");
+    addr.style.fontSize = "12px";
+    addr.textContent = place.address;
+    div.append(title, addr);
+    if (place.rating) {
+      const r = document.createElement("div");
+      r.style.fontSize = "12px";
+      r.textContent = `★ ${place.rating.toFixed(1)} (${place.reviews ?? 0})`;
+      div.append(r);
+    }
+    infoRef.current.setContent(div);
+    infoRef.current.setPosition(place.location);
+    infoRef.current.open({ map });
+    map.panTo(place.location);
+  }, [selectedPlaceId, places]);
 
   useEffect(() => {
     const map = mapRef.current;
