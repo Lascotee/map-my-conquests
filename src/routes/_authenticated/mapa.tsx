@@ -227,17 +227,27 @@ function MapaPage() {
           {results.length > 0 && (
             <ul className="space-y-1">
               {results.map((r) => (
-                <li key={r.name}>
-                  <button
-                    onClick={() => addFromResult(r)}
-                    className="w-full rounded-lg bg-sidebar-accent px-3 py-2 text-left text-sm hover:opacity-90"
-                  >
-                    {r.name}
-                  </button>
+                <li key={r.name} className="rounded-lg bg-sidebar-accent px-3 py-2">
+                  <p className="text-sm">{r.name}</p>
+                  <div className="mt-2 flex gap-2">
+                    <Button
+                      size="sm"
+                      className="flex-1"
+                      disabled={loadingPlaces}
+                      onClick={() => void findPlaces(r.bounds, r.name.split(",")[0] ?? r.name)}
+                    >
+                      <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                      Comércios
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => addFromResult(r)}>
+                      Salvar região
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
+
 
           <Button
             variant={drawing ? "default" : "outline"}
