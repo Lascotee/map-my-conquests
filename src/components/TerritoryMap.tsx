@@ -205,11 +205,14 @@ export default function TerritoryMap({
       });
     }
 
-    for (const [id, poly] of shapes) {
-      if (!seen.has(id)) {
-        poly.setMap(null);
-        shapes.delete(id);
+      for (const [id, poly] of shapes) {
+        if (!seen.has(id)) {
+          poly.setMap(null);
+          shapes.delete(id);
+        }
       }
+    } catch (err) {
+      console.error("Falha ao desenhar regiões no mapa", err);
     }
   }, [territories, selectedId, drawing]);
 
