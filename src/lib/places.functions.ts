@@ -172,6 +172,7 @@ export const searchAestheticPlaces = createServerFn({ method: "POST" })
           lng: r.location.lng,
           categories: r.matched,
           area_name: data.areaName,
+          status: statusById.get(r.id) ?? "pendente",
         })),
         { onConflict: "user_id,place_id", ignoreDuplicates: false },
       );
