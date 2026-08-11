@@ -11,6 +11,7 @@ type Props = {
   drawing: boolean;
   selectedId: string | null;
   focus: { bounds: { north: number; south: number; east: number; west: number } } | null;
+  preview?: LatLngLiteral[] | null;
   places?: PlaceResult[];
   selectedPlaceId?: string | null;
   onSelectPlace?: (id: string) => void;
@@ -26,6 +27,7 @@ export default function TerritoryMap({
   drawing,
   selectedId,
   focus,
+  preview = null,
   places = [],
   selectedPlaceId = null,
   onSelectPlace,
