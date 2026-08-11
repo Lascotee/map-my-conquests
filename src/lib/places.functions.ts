@@ -151,6 +151,11 @@ export const searchAestheticPlaces = createServerFn({ method: "POST" })
     );
 
     if (results.length) {
+      const { data: existing } = await context.supabase
+        .from("leads")
+        .select("place_id, status")
+        .in("place_id", results.map((r) => r.id));
+      const statusById = new Map((existing ?? []).map((l) => [l.place_id, l.status]));
       const { error } = await context.supabase.from("leads").upsert(
         results.map((r) => ({
           user_id: context.userId,
