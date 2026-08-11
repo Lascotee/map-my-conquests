@@ -300,6 +300,29 @@ export default function TerritoryMap({
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || !window.google?.maps?.Polygon) return;
+    if (!preview || preview.length < 3) {
+      previewRef.current?.setMap(null);
+      previewRef.current = null;
+      return;
+    }
+    if (!previewRef.current) {
+      previewRef.current = new window.google.maps.Polygon({
+        map,
+        clickable: false,
+        strokeColor: "#e0533d",
+        strokeOpacity: 0.95,
+        strokeWeight: 3,
+        fillColor: "#e0533d",
+        fillOpacity: 0.08,
+        zIndex: 30,
+      });
+    }
+    previewRef.current.setPath(preview);
+  }, [preview]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map || !focus || !window.google) return;
     const b = focus.bounds;
     map.fitBounds(
