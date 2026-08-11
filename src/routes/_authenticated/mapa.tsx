@@ -1,14 +1,16 @@
 import { Suspense, lazy, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { ClientOnly } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { LogOut, PencilRuler, Search, Sparkles, Star, Trash2, X } from "lucide-react";
+import { LogOut, PencilRuler, Plus, Search, Sparkles, Star, Trash2, Users, X } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
-import { searchArea, type GeocodeResult } from "@/lib/geocode.functions";
+import { searchArea } from "@/lib/geocode.functions";
+import { searchBoundary, type BoundaryResult } from "@/lib/boundary.functions";
 import { searchAestheticPlaces, type PlaceResult } from "@/lib/places.functions";
+import { boundsOf, rectPath, type Bounds } from "@/lib/geo";
 import { STATUS_META, type LatLngLiteral, type Territory, type TerritoryStatus } from "@/lib/maps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +36,8 @@ const STATUS_ORDER: TerritoryStatus[] = ["pendente", "andamento", "concluido"];
 function MapaPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const runSearch = useServerFn(searchArea);
+  const runBoundary = useServerFn(searchBoundary);
+  const runGeocode = useServerFn(searchArea);
   const runPlaces = useServerFn(searchAestheticPlaces);
 
   const [drawing, setDrawing] = useState(false);
@@ -42,14 +45,16 @@ function MapaPage() {
   const [finishSignal, setFinishSignal] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<GeocodeResult[]>([]);
+  const [results, setResults] = useState<BoundaryResult[]>([]);
+  const [preview, setPreview] = useState<BoundaryResult | null>(null);
   const [searching, setSearching] = useState(false);
-  const [focus, setFocus] = useState<{ bounds: GeocodeResult["bounds"] } | null>(null);
+  const [focus, setFocus] = useState<{ bounds: Bounds } | null>(null);
   const [places, setPlaces] = useState<PlaceResult[]>([]);
   const [placeAreaName, setPlaceAreaName] = useState("");
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [loadingPlaces, setLoadingPlaces] = useState(false);
-
+  const [categories, setCategories] = useState<string[]>([]);
+  const [categoryInput, setCategoryInput] = useState("");
 
   const { data: territories = [] } = useQuery({
     queryKey: ["territories"],
@@ -80,7 +85,7 @@ function MapaPage() {
     onSuccess: async (data) => {
       await invalidate();
       setSelectedId(data.id);
-      toast.success("Região adicionada");
+      toast.success("Região marcada");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar"),
   });
@@ -117,10 +122,24 @@ function MapaPage() {
     if (query.trim().length < 2) return;
     setSearching(true);
     try {
-      const found = await runSearch({ data: { query } });
+      let found = await runBoundary({ data: { query } });
+      if (found.length === 0) {
+        const geo = await runGeocode({ data: { query } });
+        found = geo.map((g) => ({
+          name: g.name,
+          shortName: g.name.split(",")[0] ?? g.name,
+          type: "",
+          path: rectPath(g.bounds),
+          bounds: g.bounds,
+          exact: false,
+        }));
+      }
       setResults(found);
-      if (found.length === 0) toast.info("Nada encontrado para essa busca");
-      else setFocus({ bounds: found[0]!.bounds });
+      if (found.length === 0) {
+        toast.info("Nada encontrado para essa busca");
+      } else {
+        selectResult(found[0]!);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Busca indisponível");
     } finally {
@@ -128,32 +147,32 @@ function MapaPage() {
     }
   }
 
-  function addFromResult(r: GeocodeResult) {
-    const b = r.bounds;
-    const path: LatLngLiteral[] = [
-      { lat: b.north, lng: b.west },
-      { lat: b.north, lng: b.east },
-      { lat: b.south, lng: b.east },
-      { lat: b.south, lng: b.west },
-    ];
-    setFocus({ bounds: b });
-    createTerritory.mutate({ name: r.name.split(",")[0] ?? r.name, path });
-    setResults([]);
-    setQuery("");
+  function selectResult(r: BoundaryResult) {
+    setPreview(r);
+    setFocus({ bounds: r.bounds });
+    setSelectedId(null);
   }
 
-  async function findPlaces(bounds: GeocodeResult["bounds"], areaName: string) {
+  function addCategory() {
+    const value = categoryInput.trim();
+    if (!value) return;
+    setCategories((c) => (c.includes(value) ? c : [...c, value]));
+    setCategoryInput("");
+  }
+
+  async function findPlaces(polygon: LatLngLiteral[], areaName: string) {
     setLoadingPlaces(true);
     setSelectedPlaceId(null);
-    setFocus({ bounds });
+    setFocus({ bounds: boundsOf(polygon) });
     try {
-      const found = await runPlaces({ data: { bounds } });
+      const found = await runPlaces({ data: { polygon, categories, areaName } });
       setPlaces(found);
       setPlaceAreaName(areaName);
+      await queryClient.invalidateQueries({ queryKey: ["leads"] });
       toast[found.length ? "success" : "info"](
         found.length
-          ? `${found.length} comércios de estética encontrados`
-          : "Nenhum comércio de estética encontrado nessa área",
+          ? `${found.length} comércios encontrados na área`
+          : "Nenhum comércio encontrado nessa área",
       );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Busca de comércios indisponível");
@@ -163,37 +182,36 @@ function MapaPage() {
   }
 
   const selected = territories.find((t) => t.id === selectedId) ?? null;
-  const selectedBounds = selected
-    ? {
-        north: Math.max(...selected.path.map((p) => p.lat)),
-        south: Math.min(...selected.path.map((p) => p.lat)),
-        east: Math.max(...selected.path.map((p) => p.lng)),
-        west: Math.min(...selected.path.map((p) => p.lng)),
-      }
-    : null;
   const counts = STATUS_ORDER.map((s) => ({
     status: s,
     total: territories.filter((t) => t.status === s).length,
   }));
-
 
   return (
     <div className="flex h-screen flex-col bg-background lg:flex-row">
       <aside className="flex w-full shrink-0 flex-col border-b border-sidebar-border bg-sidebar text-sidebar-foreground lg:h-full lg:w-96 lg:border-b-0 lg:border-r">
         <div className="flex items-center justify-between px-5 py-4">
           <span className="font-display text-base font-bold">Territórios</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Sair"
-            onClick={async () => {
-              await supabase.auth.signOut();
-              queryClient.clear();
-              void navigate({ to: "/auth" });
-            }}
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/leads">
+                <Users className="mr-1.5 h-4 w-4" />
+                Leads
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Sair"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                queryClient.clear();
+                void navigate({ to: "/auth" });
+              }}
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-2 px-5 pb-4">
@@ -227,33 +245,98 @@ function MapaPage() {
           {results.length > 0 && (
             <ul className="space-y-1">
               {results.map((r) => (
-                <li key={r.name} className="rounded-lg bg-sidebar-accent px-3 py-2">
-                  <p className="text-sm">{r.name}</p>
-                  <div className="mt-2 flex gap-2">
-                    <Button
-                      size="sm"
-                      className="flex-1"
-                      disabled={loadingPlaces}
-                      onClick={() => void findPlaces(r.bounds, r.name.split(",")[0] ?? r.name)}
-                    >
-                      <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                      Comércios
-                    </Button>
-                    <Button size="sm" variant="outline" className="flex-1" onClick={() => addFromResult(r)}>
-                      Salvar região
-                    </Button>
-                  </div>
+                <li
+                  key={r.name}
+                  className={`rounded-lg px-3 py-2 ${
+                    preview?.name === r.name ? "bg-sidebar-primary text-sidebar-primary-foreground" : "bg-sidebar-accent"
+                  }`}
+                >
+                  <button className="block w-full text-left" onClick={() => selectResult(r)}>
+                    <span className="block text-sm">{r.shortName}</span>
+                    <span className="block truncate text-[11px] opacity-70">{r.name}</span>
+                    <span className="text-[11px] opacity-70">
+                      {r.exact ? "Contorno exato do local" : "Área aproximada"}
+                    </span>
+                  </button>
+                  {preview?.name === r.name && (
+                    <div className="mt-2 flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="flex-1"
+                        onClick={() => {
+                          createTerritory.mutate({ name: r.shortName, path: r.path });
+                          setResults([]);
+                          setPreview(null);
+                          setQuery("");
+                        }}
+                      >
+                        Marcar esta área
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="flex-1"
+                        disabled={loadingPlaces}
+                        onClick={() => void findPlaces(r.path, r.shortName)}
+                      >
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                        Procurar
+                      </Button>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
           )}
 
+          <div className="space-y-2 rounded-lg bg-sidebar-accent px-3 py-3">
+            <Label className="text-[11px] uppercase tracking-wide opacity-70">
+              Categorias de comércio
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                value={categoryInput}
+                onChange={(e) => setCategoryInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCategory();
+                  }
+                }}
+                placeholder="ex.: dentista"
+                className="h-9 border-sidebar-border bg-sidebar text-sidebar-foreground placeholder:opacity-60"
+              />
+              <Button size="icon" className="h-9 w-9" aria-label="Adicionar categoria" onClick={addCategory}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            {categories.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {categories.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setCategories((list) => list.filter((x) => x !== c))}
+                    className="flex items-center gap-1 rounded-full bg-sidebar px-2.5 py-1 text-xs"
+                  >
+                    {c}
+                    <X className="h-3 w-3 opacity-70" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] opacity-70">
+                Sem categorias: usa o preset de estética/harmonização.
+              </p>
+            )}
+          </div>
 
           <Button
             variant={drawing ? "default" : "outline"}
             className="w-full"
             onClick={() => {
               setSelectedId(null);
+              setPreview(null);
               setDrawing((d) => !d);
             }}
           >
@@ -281,15 +364,13 @@ function MapaPage() {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto border-t border-sidebar-border px-5 py-4">
-          {loadingPlaces && (
-            <p className="mb-3 text-sm opacity-70">Procurando clínicas e comércios de estética…</p>
-          )}
+          {loadingPlaces && <p className="mb-3 text-sm opacity-70">Procurando comércios na área…</p>}
 
           {places.length > 0 && (
             <div className="mb-5">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wide opacity-70">
-                  Estética em {placeAreaName} ({places.length})
+                  Comércios em {placeAreaName} ({places.length})
                 </span>
                 <Button
                   variant="ghost"
@@ -303,6 +384,9 @@ function MapaPage() {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
+              <Button asChild size="sm" variant="outline" className="mb-2 w-full">
+                <Link to="/leads">Abrir aba de leads</Link>
+              </Button>
               <ul className="space-y-2">
                 {places.map((p) => (
                   <li key={p.id}>
@@ -338,7 +422,10 @@ function MapaPage() {
               {territories.map((t) => (
                 <li key={t.id}>
                   <button
-                    onClick={() => setSelectedId(t.id)}
+                    onClick={() => {
+                      setPreview(null);
+                      setSelectedId(t.id);
+                    }}
                     className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm ${
                       t.id === selectedId ? "bg-sidebar-primary text-sidebar-primary-foreground" : "bg-sidebar-accent"
                     }`}
@@ -364,13 +451,13 @@ function MapaPage() {
               drawing={drawing}
               selectedId={selectedId}
               focus={focus}
+              preview={preview?.path ?? null}
               places={places}
               selectedPlaceId={selectedPlaceId}
               onSelectPlace={setSelectedPlaceId}
               onSelect={setSelectedId}
               onDraftChange={setDraftPoints}
               finishSignal={finishSignal}
-
               onPolygonComplete={(path) => {
                 setDrawing(false);
                 setDraftPoints(0);
@@ -380,6 +467,37 @@ function MapaPage() {
             />
           </Suspense>
         </ClientOnly>
+
+        {preview && (
+          <div className="absolute left-1/2 top-4 w-[min(24rem,calc(100%-2rem))] -translate-x-1/2 rounded-2xl border border-border bg-card p-4 shadow-lg">
+            <p className="text-sm font-semibold">{preview.shortName}</p>
+            <p className="truncate text-xs text-muted-foreground">{preview.name}</p>
+            <div className="mt-3 flex gap-2">
+              <Button
+                className="flex-1"
+                onClick={() => {
+                  createTerritory.mutate({ name: preview.shortName, path: preview.path });
+                  setPreview(null);
+                  setResults([]);
+                  setQuery("");
+                }}
+              >
+                Marcar esta área
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                disabled={loadingPlaces}
+                onClick={() => void findPlaces(preview.path, preview.shortName)}
+              >
+                {loadingPlaces ? "Buscando…" : "Procurar na região"}
+              </Button>
+              <Button variant="ghost" size="icon" aria-label="Fechar" onClick={() => setPreview(null)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         {selected && (
           <div className="absolute right-4 top-4 w-[min(20rem,calc(100%-2rem))] rounded-2xl border border-border bg-card p-5 shadow-lg">
@@ -441,11 +559,11 @@ function MapaPage() {
               <Button
                 variant="outline"
                 className="w-full"
-                disabled={loadingPlaces || !selectedBounds}
-                onClick={() => selectedBounds && void findPlaces(selectedBounds, selected.name)}
+                disabled={loadingPlaces}
+                onClick={() => void findPlaces(selected.path, selected.name)}
               >
                 <Sparkles className="mr-2 h-4 w-4" />
-                {loadingPlaces ? "Buscando…" : "Buscar comércios de estética"}
+                {loadingPlaces ? "Buscando…" : "Procurar comércios nesta área"}
               </Button>
 
               <Button

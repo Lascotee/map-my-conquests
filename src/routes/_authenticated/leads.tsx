@@ -1,0 +1,325 @@
+import { useMemo, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { ArrowLeft, Globe, Instagram, MapPin, MessageCircle, Phone, Star } from "lucide-react";
+
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+
+export const Route = createFileRoute("/_authenticated/leads")({
+  head: () => ({
+    meta: [
+      { title: "Leads WhatsApp — comércios mapeados" },
+      {
+        name: "description",
+        content: "Gerencie os comércios encontrados nas regiões marcadas e dispare mensagens no WhatsApp.",
+      },
+      { property: "og:title", content: "Leads WhatsApp — comércios mapeados" },
+      {
+        property: "og:description",
+        content: "Gerencie os comércios encontrados nas regiões marcadas e dispare mensagens no WhatsApp.",
+      },
+    ],
+  }),
+  component: LeadsPage,
+});
+
+type LeadStatus = "pendente" | "contatado" | "ignorado";
+
+type Lead = {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  area_name: string;
+  categories: string[];
+  phone: string | null;
+  website: string | null;
+  instagram: string | null;
+  rating: number | null;
+  reviews: number | null;
+  status: LeadStatus;
+  lat: number;
+  lng: number;
+};
+
+const STATUS: { key: LeadStatus | "todos"; label: string }[] = [
+  { key: "todos", label: "Todos" },
+  { key: "pendente", label: "Pendentes" },
+  { key: "contatado", label: "Contatados" },
+  { key: "ignorado", label: "Ignorados" },
+];
+
+const DEFAULT_TEMPLATE =
+  "{saudacao}, tudo bem? Vi a {nome} aqui em {cidade} e queria falar rapidinho sobre uma ideia para atrair mais pacientes. Posso te mandar os detalhes?";
+
+const TEMPLATE_KEY = "leads:template";
+
+function saudacao(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
+function onlyDigits(phone: string): string {
+  const d = phone.replace(/\D/g, "");
+  if (d.length <= 11) return `55${d}`;
+  return d;
+}
+
+function LeadsPage() {
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<LeadStatus | "todos">("todos");
+  const [area, setArea] = useState("todas");
+  const [template, setTemplate] = useState(() => {
+    if (typeof window === "undefined") return DEFAULT_TEMPLATE;
+    return window.localStorage.getItem(TEMPLATE_KEY) ?? DEFAULT_TEMPLATE;
+  });
+
+  const { data: leads = [], isLoading } = useQuery({
+    queryKey: ["leads"],
+    queryFn: async (): Promise<Lead[]> => {
+      const { data, error } = await supabase
+        .from("leads")
+        .select(
+          "id, name, address, city, area_name, categories, phone, website, instagram, rating, reviews, status, lat, lng",
+        )
+        .order("reviews", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Lead[];
+    },
+  });
+
+  const setStatusMutation = useMutation({
+    mutationFn: async (input: { id: string; status: LeadStatus }) => {
+      const { error } = await supabase
+        .from("leads")
+        .update({ status: input.status })
+        .eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao atualizar lead"),
+  });
+
+  const areas = useMemo(
+    () => [...new Set(leads.map((l) => l.area_name).filter(Boolean))].sort(),
+    [leads],
+  );
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return leads.filter((l) => {
+      if (status !== "todos" && l.status !== status) return false;
+      if (area !== "todas" && l.area_name !== area) return false;
+      if (!q) return true;
+      return [l.name, l.city, l.address, l.area_name, ...(l.categories ?? [])]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [leads, search, status, area]);
+
+  function messageFor(lead: Lead) {
+    return template
+      .replaceAll("{saudacao}", saudacao())
+      .replaceAll("{nome}", lead.name)
+      .replaceAll("{cidade}", lead.city || lead.area_name)
+      .replaceAll("{regiao}", lead.area_name);
+  }
+
+  function sendWhatsapp(lead: Lead) {
+    if (!lead.phone) {
+      toast.error("Esse comércio não tem telefone cadastrado");
+      return;
+    }
+    const url = `https://wa.me/${onlyDigits(lead.phone)}?text=${encodeURIComponent(messageFor(lead))}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    if (lead.status === "pendente") setStatusMutation.mutate({ id: lead.id, status: "contatado" });
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border bg-card">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-5 py-4">
+          <div>
+            <h1 className="font-display text-xl font-bold">Leads WhatsApp</h1>
+            <p className="text-xs text-muted-foreground">
+              {filtered.length} de {leads.length} comércios mapeados
+            </p>
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/mapa">
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              Mapa
+            </Link>
+          </Button>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-5xl space-y-5 px-5 py-6">
+        <section className="space-y-3 rounded-2xl border border-border bg-card p-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="busca">Buscar</Label>
+              <Input
+                id="busca"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Nome, cidade, categoria…"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="regiao">Região</Label>
+              <select
+                id="regiao"
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="todas">Todas as regiões</option>
+                {areas.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {STATUS.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setStatus(s.key)}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                  status === s.key
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="modelo">Modelo de mensagem</Label>
+            <Textarea
+              id="modelo"
+              value={template}
+              rows={3}
+              onChange={(e) => {
+                setTemplate(e.target.value);
+                try {
+                  window.localStorage.setItem(TEMPLATE_KEY, e.target.value);
+                } catch {
+                  /* ignore */
+                }
+              }}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Variáveis: {"{saudacao}"}, {"{nome}"}, {"{cidade}"}, {"{regiao}"}
+            </p>
+          </div>
+        </section>
+
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Carregando leads…</p>
+        ) : filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Nenhum lead por aqui. Volte ao mapa, marque uma região e procure comércios.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {filtered.map((lead) => (
+              <li key={lead.id} className="rounded-2xl border border-border bg-card p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h2 className="truncate font-semibold">{lead.name}</h2>
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <MapPin className="h-3 w-3" />
+                      {[lead.city, lead.area_name].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  {lead.rating !== null && (
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Star className="h-3 w-3" />
+                      {lead.rating.toFixed(1)} · {lead.reviews ?? 0}
+                    </span>
+                  )}
+                </div>
+
+                <p className="mt-2 text-xs text-muted-foreground">{lead.address}</p>
+
+                <div className="mt-3 flex flex-wrap gap-3 text-xs">
+                  <span className="flex items-center gap-1">
+                    <Phone className="h-3.5 w-3.5" />
+                    {lead.phone ?? "sem telefone"}
+                  </span>
+                  {lead.website && (
+                    <a
+                      href={lead.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-primary underline-offset-2 hover:underline"
+                    >
+                      <Globe className="h-3.5 w-3.5" />
+                      Site
+                    </a>
+                  )}
+                  {lead.instagram && (
+                    <a
+                      href={lead.instagram}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-primary underline-offset-2 hover:underline"
+                    >
+                      <Instagram className="h-3.5 w-3.5" />
+                      Instagram
+                    </a>
+                  )}
+                </div>
+
+                {lead.categories?.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {lead.categories.slice(0, 4).map((c) => (
+                      <span key={c} className="rounded-full bg-muted px-2 py-0.5 text-[11px]">
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <Button className="flex-1 min-w-48" onClick={() => sendWhatsapp(lead)}>
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    Enviar no WhatsApp
+                  </Button>
+                  <select
+                    value={lead.status}
+                    onChange={(e) =>
+                      setStatusMutation.mutate({ id: lead.id, status: e.target.value as LeadStatus })
+                    }
+                    className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                    aria-label="Status do lead"
+                  >
+                    <option value="pendente">Pendente</option>
+                    <option value="contatado">Contatado</option>
+                    <option value="ignorado">Ignorado</option>
+                  </select>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </main>
+    </div>
+  );
+}

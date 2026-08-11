@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      leads: {
+        Row: {
+          address: string
+          area_name: string
+          categories: string[]
+          city: string
+          created_at: string
+          id: string
+          instagram: string | null
+          lat: number
+          lng: number
+          name: string
+          phone: string | null
+          place_id: string
+          rating: number | null
+          reviews: number | null
+          status: Database["public"]["Enums"]["lead_status"]
+          updated_at: string
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          address?: string
+          area_name?: string
+          categories?: string[]
+          city?: string
+          created_at?: string
+          id?: string
+          instagram?: string | null
+          lat: number
+          lng: number
+          name: string
+          phone?: string | null
+          place_id: string
+          rating?: number | null
+          reviews?: number | null
+          status?: Database["public"]["Enums"]["lead_status"]
+          updated_at?: string
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          address?: string
+          area_name?: string
+          categories?: string[]
+          city?: string
+          created_at?: string
+          id?: string
+          instagram?: string | null
+          lat?: number
+          lng?: number
+          name?: string
+          phone?: string | null
+          place_id?: string
+          rating?: number | null
+          reviews?: number | null
+          status?: Database["public"]["Enums"]["lead_status"]
+          updated_at?: string
+          user_id?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       territories: {
         Row: {
           created_at: string
@@ -55,6 +118,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      lead_status: "pendente" | "contatado" | "ignorado"
       territory_status: "pendente" | "andamento" | "concluido"
     }
     CompositeTypes: {
@@ -183,6 +247,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      lead_status: ["pendente", "contatado", "ignorado"],
       territory_status: ["pendente", "andamento", "concluido"],
     },
   },

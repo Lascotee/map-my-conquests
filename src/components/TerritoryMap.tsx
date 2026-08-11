@@ -11,6 +11,7 @@ type Props = {
   drawing: boolean;
   selectedId: string | null;
   focus: { bounds: { north: number; south: number; east: number; west: number } } | null;
+  preview?: LatLngLiteral[] | null;
   places?: PlaceResult[];
   selectedPlaceId?: string | null;
   onSelectPlace?: (id: string) => void;
@@ -26,6 +27,7 @@ export default function TerritoryMap({
   drawing,
   selectedId,
   focus,
+  preview = null,
   places = [],
   selectedPlaceId = null,
   onSelectPlace,
@@ -40,6 +42,7 @@ export default function TerritoryMap({
   const shapesRef = useRef<Map<string, google.maps.Polygon>>(new Map());
   const placeMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const infoRef = useRef<google.maps.InfoWindow | null>(null);
+  const previewRef = useRef<google.maps.Polygon | null>(null);
   const draftRef = useRef<LatLngLiteral[]>([]);
   const draftShapeRef = useRef<google.maps.Polygon | null>(null);
   const draftMarkersRef = useRef<google.maps.Marker[]>([]);
@@ -294,6 +297,29 @@ export default function TerritoryMap({
     infoRef.current.open({ map });
     map.panTo(place.location);
   }, [selectedPlaceId, places]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !window.google?.maps?.Polygon) return;
+    if (!preview || preview.length < 3) {
+      previewRef.current?.setMap(null);
+      previewRef.current = null;
+      return;
+    }
+    if (!previewRef.current) {
+      previewRef.current = new window.google.maps.Polygon({
+        map,
+        clickable: false,
+        strokeColor: "#e0533d",
+        strokeOpacity: 0.95,
+        strokeWeight: 3,
+        fillColor: "#e0533d",
+        fillOpacity: 0.08,
+        zIndex: 30,
+      });
+    }
+    previewRef.current.setPath(preview);
+  }, [preview]);
 
   useEffect(() => {
     const map = mapRef.current;
