@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      category_presets: {
+        Row: {
+          categories: string[]
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          categories?: string[]
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          categories?: string[]
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           address: string
@@ -25,6 +52,7 @@ export type Database = {
           instagram: string | null
           lat: number
           lng: number
+          maps_opened_at: string | null
           name: string
           phone: string | null
           place_id: string
@@ -45,6 +73,7 @@ export type Database = {
           instagram?: string | null
           lat: number
           lng: number
+          maps_opened_at?: string | null
           name: string
           phone?: string | null
           place_id: string
@@ -65,6 +94,7 @@ export type Database = {
           instagram?: string | null
           lat?: number
           lng?: number
+          maps_opened_at?: string | null
           name?: string
           phone?: string | null
           place_id?: string

@@ -4,7 +4,7 @@ import { ClientOnly } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { LogOut, PencilRuler, Plus, Search, Sparkles, Star, Trash2, Users, X } from "lucide-react";
+import { Globe2, LogOut, PencilRuler, Plus, Save, Search, Sparkles, Star, Trash2, Users, X } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { searchArea } from "@/lib/geocode.functions";
@@ -55,6 +55,7 @@ function MapaPage() {
   const [loadingPlaces, setLoadingPlaces] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
   const [categoryInput, setCategoryInput] = useState("");
+  const [presetName, setPresetName] = useState("");
 
   const { data: territories = [] } = useQuery({
     queryKey: ["territories"],
@@ -66,6 +67,46 @@ function MapaPage() {
       if (error) throw error;
       return (data ?? []) as unknown as Territory[];
     },
+  });
+
+  const { data: presets = [] } = useQuery({
+    queryKey: ["category-presets"],
+    queryFn: async (): Promise<{ id: string; name: string; categories: string[] }[]> => {
+      const { data, error } = await supabase
+        .from("category_presets")
+        .select("id, name, categories")
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const savePreset = useMutation({
+    mutationFn: async () => {
+      const name = presetName.trim();
+      if (!name) throw new Error("Dê um nome ao preset");
+      if (categories.length === 0) throw new Error("Adicione ao menos uma categoria");
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("Sessão expirada");
+      const { error } = await supabase
+        .from("category_presets")
+        .upsert({ user_id: auth.user.id, name, categories }, { onConflict: "user_id,name" });
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      setPresetName("");
+      await queryClient.invalidateQueries({ queryKey: ["category-presets"] });
+      toast.success("Preset salvo");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar preset"),
+  });
+
+  const deletePreset = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("category_presets").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["category-presets"] }),
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["territories"] });
@@ -193,6 +234,12 @@ function MapaPage() {
         <div className="flex items-center justify-between px-5 py-4">
           <span className="font-display text-base font-bold">Territórios</span>
           <div className="flex items-center gap-1">
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/brasil">
+                <Globe2 className="mr-1.5 h-4 w-4" />
+                Brasil
+              </Link>
+            </Button>
             <Button asChild variant="ghost" size="sm">
               <Link to="/leads">
                 <Users className="mr-1.5 h-4 w-4" />
@@ -329,6 +376,57 @@ function MapaPage() {
                 Sem categorias: usa o preset de estética/harmonização.
               </p>
             )}
+
+            <div className="space-y-2 border-t border-sidebar-border pt-2">
+              <Label className="text-[11px] uppercase tracking-wide opacity-70">
+                Presets salvos
+              </Label>
+              {presets.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {presets.map((p) => (
+                    <span
+                      key={p.id}
+                      className="flex items-center gap-1 rounded-full bg-sidebar px-2.5 py-1 text-xs"
+                    >
+                      <button
+                        onClick={() => {
+                          setCategories(p.categories);
+                          toast.success(`Preset "${p.name}" aplicado`);
+                        }}
+                        title={p.categories.join(", ")}
+                      >
+                        {p.name} ({p.categories.length})
+                      </button>
+                      <button
+                        aria-label={`Excluir preset ${p.name}`}
+                        onClick={() => deletePreset.mutate(p.id)}
+                      >
+                        <Trash2 className="h-3 w-3 opacity-60" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] opacity-70">Nenhum preset salvo ainda.</p>
+              )}
+              <div className="flex gap-2">
+                <Input
+                  value={presetName}
+                  onChange={(e) => setPresetName(e.target.value)}
+                  placeholder="Nome do preset"
+                  className="h-9 border-sidebar-border bg-sidebar text-sidebar-foreground placeholder:opacity-60"
+                />
+                <Button
+                  size="icon"
+                  className="h-9 w-9"
+                  aria-label="Salvar preset"
+                  disabled={savePreset.isPending}
+                  onClick={() => savePreset.mutate()}
+                >
+                  <Save className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
 
           <Button
