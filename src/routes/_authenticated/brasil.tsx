@@ -132,11 +132,15 @@ function BrasilPage() {
   const activeLevel: Level = munCode ? detailLevel : ufCode ? "municipios" : regionCode ? "ufs" : "ufs";
   const meta = LEVEL_META[activeLevel];
 
+  const bairrosUnavailable =
+    activeLevel === "bairros" && munInfo?.neighborhood_coverage !== "available_ibge_2022";
+
   const geometry = useQuery({
     queryKey: ["geo", activeLevel, ufCode],
     queryFn: () => loadGeometry(activeLevel, ufCode || undefined),
-    enabled: !meta.perUf || Boolean(ufCode),
+    enabled: (!meta.perUf || Boolean(ufCode)) && !bairrosUnavailable,
   });
+
 
   const features = useMemo<GeoFeature[]>(() => {
     const all = geometry.data?.features ?? [];
