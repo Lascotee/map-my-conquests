@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Globe, Instagram, MapPin, MessageCircle, Phone, Star } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Globe, Instagram, Map, MapPin, MessageCircle, Phone, Star } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,8 @@ type Lead = {
   status: LeadStatus;
   lat: number;
   lng: number;
+  place_id: string;
+  maps_opened_at: string | null;
 };
 
 const STATUS: { key: LeadStatus | "todos"; label: string }[] = [
@@ -88,7 +90,7 @@ function LeadsPage() {
       const { data, error } = await supabase
         .from("leads")
         .select(
-          "id, name, address, city, area_name, categories, phone, website, instagram, rating, reviews, status, lat, lng",
+          "id, name, address, city, area_name, categories, phone, website, instagram, rating, reviews, status, lat, lng, place_id, maps_opened_at",
         )
         .order("reviews", { ascending: false });
       if (error) throw error;
@@ -107,6 +109,25 @@ function LeadsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao atualizar lead"),
   });
+
+  const markOpened = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("leads")
+        .update({ maps_opened_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
+  });
+
+  function openMaps(lead: Lead) {
+    const url = lead.place_id
+      ? `https://www.google.com/maps/search/?api=1&query=${lead.lat},${lead.lng}&query_place_id=${encodeURIComponent(lead.place_id)}`
+      : `https://www.google.com/maps/search/?api=1&query=${lead.lat},${lead.lng}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    if (!lead.maps_opened_at) markOpened.mutate(lead.id);
+  }
 
   const areas = useMemo(
     () => [...new Set(leads.map((l) => l.area_name).filter(Boolean))].sort(),
@@ -239,10 +260,20 @@ function LeadsPage() {
         ) : (
           <ul className="space-y-3">
             {filtered.map((lead) => (
-              <li key={lead.id} className="rounded-2xl border border-border bg-card p-4">
+              <li
+                key={lead.id}
+                className={`rounded-2xl border bg-card p-4 ${
+                  lead.maps_opened_at ? "border-primary/60 bg-primary/5" : "border-border"
+                }`}
+              >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <h2 className="truncate font-semibold">{lead.name}</h2>
+                    <h2 className="flex items-center gap-1.5 truncate font-semibold">
+                      {lead.name}
+                      {lead.maps_opened_at && (
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-label="Já aberto no Maps" />
+                      )}
+                    </h2>
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
                       <MapPin className="h-3 w-3" />
                       {[lead.city, lead.area_name].filter(Boolean).join(" · ")}
@@ -298,9 +329,20 @@ function LeadsPage() {
                 )}
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <Button className="flex-1 min-w-48" onClick={() => sendWhatsapp(lead)}>
+                  <Button className="flex-1 min-w-44" onClick={() => sendWhatsapp(lead)}>
                     <MessageCircle className="mr-2 h-4 w-4" />
                     Enviar no WhatsApp
+                  </Button>
+                  <Button
+                    variant={lead.maps_opened_at ? "secondary" : "outline"}
+                    onClick={() => openMaps(lead)}
+                  >
+                    {lead.maps_opened_at ? (
+                      <CheckCircle2 className="mr-2 h-4 w-4 text-primary" />
+                    ) : (
+                      <Map className="mr-2 h-4 w-4" />
+                    )}
+                    {lead.maps_opened_at ? "Visto no Maps" : "Abrir no Maps"}
                   </Button>
                   <select
                     value={lead.status}
