@@ -4,20 +4,44 @@ import { ClientOnly } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Globe2, LogOut, PencilRuler, Plus, Save, Search, Sparkles, Star, Trash2, Users, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Folder,
+  FolderPlus,
+  Globe2,
+  LogOut,
+  PencilRuler,
+  Plus,
+  Save,
+  Search,
+  Sparkles,
+  Star,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { searchArea } from "@/lib/geocode.functions";
 import { searchBoundary, type BoundaryResult } from "@/lib/boundary.functions";
 import { searchAestheticPlaces, type PlaceResult } from "@/lib/places.functions";
 import { boundsOf, rectPath, type Bounds } from "@/lib/geo";
-import { STATUS_META, type LatLngLiteral, type Territory, type TerritoryStatus } from "@/lib/maps";
+import {
+  STATUS_META,
+  type LatLngLiteral,
+  type Territory,
+  type TerritoryFolder,
+  type TerritoryStatus,
+} from "@/lib/maps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
 const TerritoryMap = lazy(() => import("@/components/TerritoryMap"));
+const BrasilExplorer = lazy(() => import("@/components/BrasilExplorer"));
+
 
 export const Route = createFileRoute("/_authenticated/mapa")({
   head: () => ({
@@ -56,18 +80,65 @@ function MapaPage() {
   const [categories, setCategories] = useState<string[]>([]);
   const [categoryInput, setCategoryInput] = useState("");
   const [presetName, setPresetName] = useState("");
+  const [view, setView] = useState<"meu" | "brasil">("meu");
+  const [folderName, setFolderName] = useState("");
+  const [openFolders, setOpenFolders] = useState<string[]>([]);
 
   const { data: territories = [] } = useQuery({
     queryKey: ["territories"],
     queryFn: async (): Promise<Territory[]> => {
       const { data, error } = await supabase
         .from("territories")
-        .select("id, name, status, notes, path, updated_at")
+        .select("id, name, status, notes, path, updated_at, folder_id")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as Territory[];
     },
   });
+
+  const { data: folders = [] } = useQuery({
+    queryKey: ["territory-folders"],
+    queryFn: async (): Promise<TerritoryFolder[]> => {
+      const { data, error } = await supabase
+        .from("territory_folders")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const createFolder = useMutation({
+    mutationFn: async () => {
+      const name = folderName.trim();
+      if (!name) throw new Error("Dê um nome à pasta");
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("Sessão expirada");
+      const { error } = await supabase
+        .from("territory_folders")
+        .insert({ name, user_id: auth.user.id });
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      setFolderName("");
+      await queryClient.invalidateQueries({ queryKey: ["territory-folders"] });
+      toast.success("Pasta criada");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao criar pasta"),
+  });
+
+  const deleteFolder = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("territory_folders").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["territory-folders"] });
+      await queryClient.invalidateQueries({ queryKey: ["territories"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao excluir pasta"),
+  });
+
 
   const { data: presets = [] } = useQuery({
     queryKey: ["category-presets"],
@@ -134,7 +205,9 @@ function MapaPage() {
   const updateTerritory = useMutation({
     mutationFn: async (input: {
       id: string;
-      values: Partial<Pick<Territory, "name" | "status" | "notes">> & { path?: LatLngLiteral[] };
+      values: Partial<Pick<Territory, "name" | "status" | "notes" | "folder_id">> & {
+        path?: LatLngLiteral[];
+      };
     }) => {
       const { error } = await supabase
         .from("territories")
@@ -228,17 +301,25 @@ function MapaPage() {
     total: territories.filter((t) => t.status === s).length,
   }));
 
+  if (view === "brasil") {
+    return (
+      <ClientOnly fallback={<div className="h-screen w-full animate-pulse bg-muted" />}>
+        <Suspense fallback={<div className="h-screen w-full animate-pulse bg-muted" />}>
+          <BrasilExplorer onBack={() => setView("meu")} />
+        </Suspense>
+      </ClientOnly>
+    );
+  }
+
   return (
     <div className="flex h-screen flex-col bg-background lg:flex-row">
       <aside className="flex w-full shrink-0 flex-col border-b border-sidebar-border bg-sidebar text-sidebar-foreground lg:h-full lg:w-96 lg:border-b-0 lg:border-r">
         <div className="flex items-center justify-between px-5 py-4">
           <span className="font-display text-base font-bold">Territórios</span>
           <div className="flex items-center gap-1">
-            <Button asChild variant="ghost" size="sm">
-              <Link to="/brasil">
-                <Globe2 className="mr-1.5 h-4 w-4" />
-                Brasil
-              </Link>
+            <Button variant="ghost" size="sm" onClick={() => setView("brasil")}>
+              <Globe2 className="mr-1.5 h-4 w-4" />
+              Brasil
             </Button>
             <Button asChild variant="ghost" size="sm">
               <Link to="/leads">
@@ -336,10 +417,15 @@ function MapaPage() {
               ))}
             </ul>
           )}
+        </div>
 
-          <div className="space-y-2 rounded-lg bg-sidebar-accent px-3 py-3">
+        <details className="border-t border-sidebar-border px-5 py-4" open={false}>
+          <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-wide opacity-70">
+            Categorias de comércio
+          </summary>
+          <div className="mt-3 space-y-2 rounded-lg bg-sidebar-accent px-3 py-3">
             <Label className="text-[11px] uppercase tracking-wide opacity-70">
-              Categorias de comércio
+              O que procurar dentro da área
             </Label>
             <div className="flex gap-2">
               <Input
@@ -428,7 +514,9 @@ function MapaPage() {
               </div>
             </div>
           </div>
+        </details>
 
+        <div className="space-y-3 border-t border-sidebar-border px-5 py-4">
           <Button
             variant={drawing ? "default" : "outline"}
             className="w-full"
@@ -511,33 +599,108 @@ function MapaPage() {
             </div>
           )}
 
+          <div className="mb-3 flex gap-2">
+            <Input
+              value={folderName}
+              onChange={(e) => setFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  createFolder.mutate();
+                }
+              }}
+              placeholder="Nova pasta de áreas"
+              className="h-9 border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:opacity-60"
+            />
+            <Button
+              size="icon"
+              className="h-9 w-9"
+              aria-label="Criar pasta"
+              disabled={createFolder.isPending}
+              onClick={() => createFolder.mutate()}
+            >
+              <FolderPlus className="h-4 w-4" />
+            </Button>
+          </div>
+
           {territories.length === 0 ? (
             <p className="text-sm opacity-70">
               Nenhuma região ainda. Busque um bairro ou desenhe a área no mapa.
             </p>
           ) : (
-            <ul className="space-y-2">
-              {territories.map((t) => (
-                <li key={t.id}>
-                  <button
-                    onClick={() => {
-                      setPreview(null);
-                      setSelectedId(t.id);
-                    }}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm ${
-                      t.id === selectedId ? "bg-sidebar-primary text-sidebar-primary-foreground" : "bg-sidebar-accent"
-                    }`}
-                  >
-                    <span className="truncate pr-2">{t.name}</span>
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: STATUS_META[t.status].color }}
+            <div className="space-y-3">
+              {folders.map((f) => {
+                const items = territories.filter((t) => t.folder_id === f.id);
+                const open = openFolders.includes(f.id);
+                return (
+                  <div key={f.id} className="rounded-lg bg-sidebar-accent/60">
+                    <div className="flex items-center gap-1 px-2 py-2">
+                      <button
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm"
+                        onClick={() =>
+                          setOpenFolders((list) =>
+                            list.includes(f.id) ? list.filter((x) => x !== f.id) : [...list, f.id],
+                          )
+                        }
+                      >
+                        {open ? (
+                          <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />
+                        )}
+                        <Folder className="h-4 w-4 shrink-0 opacity-70" />
+                        <span className="truncate">{f.name}</span>
+                        <span className="ml-auto shrink-0 text-[11px] opacity-60">
+                          {items.length}
+                        </span>
+                      </button>
+                      <button
+                        aria-label={`Excluir pasta ${f.name}`}
+                        onClick={() => deleteFolder.mutate(f.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 opacity-60" />
+                      </button>
+                    </div>
+                    {open && (
+                      <ul className="space-y-1.5 px-2 pb-2">
+                        {items.length === 0 && (
+                          <li className="px-1 text-[11px] opacity-60">Pasta vazia</li>
+                        )}
+                        {items.map((t) => (
+                          <TerritoryRow
+                            key={t.id}
+                            territory={t}
+                            active={t.id === selectedId}
+                            onOpen={() => {
+                              setPreview(null);
+                              setSelectedId(t.id);
+                            }}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+
+              <ul className="space-y-2">
+                {territories
+                  .filter((t) => !t.folder_id)
+                  .map((t) => (
+                    <TerritoryRow
+                      key={t.id}
+                      territory={t}
+                      active={t.id === selectedId}
+                      onOpen={() => {
+                        setPreview(null);
+                        setSelectedId(t.id);
+                      }}
                     />
-                  </button>
-                </li>
-              ))}
-            </ul>
+                  ))}
+              </ul>
+            </div>
           )}
+
         </div>
       </aside>
 

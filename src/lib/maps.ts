@@ -52,4 +52,8 @@ export type Territory = {
   notes: string | null;
   path: LatLngLiteral[];
   updated_at: string;
+  folder_id?: string | null;
 };
+
+export type TerritoryFolder = { id: string; name: string };
+
