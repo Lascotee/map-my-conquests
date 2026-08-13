@@ -864,3 +864,30 @@ function MapaPage() {
     </div>
   );
 }
+
+function TerritoryRow({
+  territory,
+  active,
+  onOpen,
+}: {
+  territory: Territory;
+  active: boolean;
+  onOpen: () => void;
+}) {
+  return (
+    <li>
+      <button
+        onClick={onOpen}
+        className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition ${
+          active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "bg-sidebar-accent"
+        }`}
+      >
+        <span className="truncate pr-2">{territory.name}</span>
+        <span
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ backgroundColor: STATUS_META[territory.status].color }}
+        />
+      </button>
+    </li>
+  );
+}
