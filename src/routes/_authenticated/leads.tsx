@@ -2,7 +2,20 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, CheckCircle2, Globe, Instagram, Map, MapPin, MessageCircle, Phone, Star } from "lucide-react";
+import {
+  ArrowLeft,
+  Ban,
+  CheckCircle2,
+  Clock,
+  Globe,
+  Instagram,
+  Map,
+  MapPin,
+  MessageCircle,
+  Phone,
+  Star,
+  Trash2,
+} from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -121,6 +134,30 @@ function LeadsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
   });
 
+  const deleteLead = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("leads").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["leads"] });
+      toast.success("Lead excluído");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao excluir lead"),
+  });
+
+  const clearLeads = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.from("leads").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["leads"] });
+      toast.success("Lista limpa");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao limpar lista"),
+  });
+
   function openMaps(lead: Lead) {
     const url = lead.place_id
       ? `https://www.google.com/maps/search/?api=1&query=${lead.lat},${lead.lng}&query_place_id=${encodeURIComponent(lead.place_id)}`
@@ -175,12 +212,32 @@ function LeadsPage() {
               {filtered.length} de {leads.length} comércios mapeados
             </p>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link to="/mapa">
-              <ArrowLeft className="mr-1.5 h-4 w-4" />
-              Mapa
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              disabled={filtered.length === 0 || clearLeads.isPending}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Tem certeza que quer excluir ${filtered.length} lead(s) da lista atual?`,
+                  )
+                ) {
+                  clearLeads.mutate(filtered.map((l) => l.id));
+                }
+              }}
+            >
+              <Trash2 className="mr-1.5 h-4 w-4" />
+              Limpar lista
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/mapa">
+                <ArrowLeft className="mr-1.5 h-4 w-4" />
+                Mapa
+              </Link>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -263,15 +320,25 @@ function LeadsPage() {
               <li
                 key={lead.id}
                 className={`rounded-2xl border bg-card p-4 ${
-                  lead.maps_opened_at ? "border-primary/60 bg-primary/5" : "border-border"
+                  lead.status === "contatado"
+                    ? "border-primary/60 bg-primary/5"
+                    : lead.status === "ignorado"
+                      ? "border-border opacity-70"
+                      : "border-border"
                 }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h2 className="flex items-center gap-1.5 truncate font-semibold">
                       {lead.name}
-                      {lead.maps_opened_at && (
-                        <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-label="Já aberto no Maps" />
+                      {lead.status === "contatado" && (
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-label="Contatado" />
+                      )}
+                      {lead.status === "ignorado" && (
+                        <Ban className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Ignorado" />
+                      )}
+                      {lead.status === "pendente" && (
+                        <Clock className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Pendente" />
                       )}
                     </h2>
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -333,29 +400,48 @@ function LeadsPage() {
                     <MessageCircle className="mr-2 h-4 w-4" />
                     Enviar no WhatsApp
                   </Button>
-                  <Button
-                    variant={lead.maps_opened_at ? "secondary" : "outline"}
-                    onClick={() => openMaps(lead)}
-                  >
-                    {lead.maps_opened_at ? (
-                      <CheckCircle2 className="mr-2 h-4 w-4 text-primary" />
-                    ) : (
-                      <Map className="mr-2 h-4 w-4" />
-                    )}
+                  <Button variant="outline" onClick={() => openMaps(lead)}>
+                    <Map className="mr-2 h-4 w-4" />
                     {lead.maps_opened_at ? "Visto no Maps" : "Abrir no Maps"}
                   </Button>
-                  <select
-                    value={lead.status}
-                    onChange={(e) =>
-                      setStatusMutation.mutate({ id: lead.id, status: e.target.value as LeadStatus })
-                    }
-                    className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                    aria-label="Status do lead"
+
+                  <div className="flex items-center gap-1">
+                    {(
+                      [
+                        { key: "contatado", Icon: CheckCircle2, label: "Contatado" },
+                        { key: "pendente", Icon: Clock, label: "Pendente" },
+                        { key: "ignorado", Icon: Ban, label: "Ignorado" },
+                      ] as { key: LeadStatus; Icon: typeof Clock; label: string }[]
+                    ).map(({ key, Icon, label }) => (
+                      <button
+                        key={key}
+                        aria-label={label}
+                        title={label}
+                        onClick={() => setStatusMutation.mutate({ id: lead.id, status: key })}
+                        className={`flex h-10 w-10 items-center justify-center rounded-full border transition ${
+                          lead.status === key
+                            ? "border-transparent bg-primary text-primary-foreground"
+                            : "border-input bg-background text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </button>
+                    ))}
+                  </div>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Excluir lead"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => {
+                      if (window.confirm(`Excluir o lead "${lead.name}"?`)) {
+                        deleteLead.mutate(lead.id);
+                      }
+                    }}
                   >
-                    <option value="pendente">Pendente</option>
-                    <option value="contatado">Contatado</option>
-                    <option value="ignorado">Ignorado</option>
-                  </select>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </li>
             ))}
