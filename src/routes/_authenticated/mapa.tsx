@@ -804,6 +804,28 @@ function MapaPage() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="pasta">Pasta</Label>
+                <select
+                  id="pasta"
+                  value={selected.folder_id ?? ""}
+                  onChange={(e) =>
+                    updateTerritory.mutate({
+                      id: selected.id,
+                      values: { folder_id: e.target.value || null },
+                    })
+                  }
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">Sem pasta</option>
+                  {folders.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="notas">Anotações</Label>
                 <Textarea
                   id="notas"
