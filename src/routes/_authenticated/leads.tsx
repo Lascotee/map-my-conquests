@@ -134,6 +134,30 @@ function LeadsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
   });
 
+  const deleteLead = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("leads").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["leads"] });
+      toast.success("Lead excluído");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao excluir lead"),
+  });
+
+  const clearLeads = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.from("leads").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["leads"] });
+      toast.success("Lista limpa");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao limpar lista"),
+  });
+
   function openMaps(lead: Lead) {
     const url = lead.place_id
       ? `https://www.google.com/maps/search/?api=1&query=${lead.lat},${lead.lng}&query_place_id=${encodeURIComponent(lead.place_id)}`
