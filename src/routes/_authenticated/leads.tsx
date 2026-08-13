@@ -212,12 +212,32 @@ function LeadsPage() {
               {filtered.length} de {leads.length} comércios mapeados
             </p>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link to="/mapa">
-              <ArrowLeft className="mr-1.5 h-4 w-4" />
-              Mapa
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              disabled={filtered.length === 0 || clearLeads.isPending}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Tem certeza que quer excluir ${filtered.length} lead(s) da lista atual?`,
+                  )
+                ) {
+                  clearLeads.mutate(filtered.map((l) => l.id));
+                }
+              }}
+            >
+              <Trash2 className="mr-1.5 h-4 w-4" />
+              Limpar lista
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/mapa">
+                <ArrowLeft className="mr-1.5 h-4 w-4" />
+                Mapa
+              </Link>
+            </Button>
+          </div>
         </div>
       </header>
 
