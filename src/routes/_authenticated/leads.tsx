@@ -2,7 +2,20 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, CheckCircle2, Globe, Instagram, Map, MapPin, MessageCircle, Phone, Star } from "lucide-react";
+import {
+  ArrowLeft,
+  Ban,
+  CheckCircle2,
+  Clock,
+  Globe,
+  Instagram,
+  Map,
+  MapPin,
+  MessageCircle,
+  Phone,
+  Star,
+  Trash2,
+} from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
