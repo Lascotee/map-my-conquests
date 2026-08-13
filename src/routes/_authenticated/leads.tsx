@@ -320,15 +320,25 @@ function LeadsPage() {
               <li
                 key={lead.id}
                 className={`rounded-2xl border bg-card p-4 ${
-                  lead.maps_opened_at ? "border-primary/60 bg-primary/5" : "border-border"
+                  lead.status === "contatado"
+                    ? "border-primary/60 bg-primary/5"
+                    : lead.status === "ignorado"
+                      ? "border-border opacity-70"
+                      : "border-border"
                 }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h2 className="flex items-center gap-1.5 truncate font-semibold">
                       {lead.name}
-                      {lead.maps_opened_at && (
-                        <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-label="Já aberto no Maps" />
+                      {lead.status === "contatado" && (
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-label="Contatado" />
+                      )}
+                      {lead.status === "ignorado" && (
+                        <Ban className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Ignorado" />
+                      )}
+                      {lead.status === "pendente" && (
+                        <Clock className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Pendente" />
                       )}
                     </h2>
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
