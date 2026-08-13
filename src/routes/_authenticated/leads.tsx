@@ -400,29 +400,48 @@ function LeadsPage() {
                     <MessageCircle className="mr-2 h-4 w-4" />
                     Enviar no WhatsApp
                   </Button>
-                  <Button
-                    variant={lead.maps_opened_at ? "secondary" : "outline"}
-                    onClick={() => openMaps(lead)}
-                  >
-                    {lead.maps_opened_at ? (
-                      <CheckCircle2 className="mr-2 h-4 w-4 text-primary" />
-                    ) : (
-                      <Map className="mr-2 h-4 w-4" />
-                    )}
+                  <Button variant="outline" onClick={() => openMaps(lead)}>
+                    <Map className="mr-2 h-4 w-4" />
                     {lead.maps_opened_at ? "Visto no Maps" : "Abrir no Maps"}
                   </Button>
-                  <select
-                    value={lead.status}
-                    onChange={(e) =>
-                      setStatusMutation.mutate({ id: lead.id, status: e.target.value as LeadStatus })
-                    }
-                    className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                    aria-label="Status do lead"
+
+                  <div className="flex items-center gap-1">
+                    {(
+                      [
+                        { key: "contatado", Icon: CheckCircle2, label: "Contatado" },
+                        { key: "pendente", Icon: Clock, label: "Pendente" },
+                        { key: "ignorado", Icon: Ban, label: "Ignorado" },
+                      ] as { key: LeadStatus; Icon: typeof Clock; label: string }[]
+                    ).map(({ key, Icon, label }) => (
+                      <button
+                        key={key}
+                        aria-label={label}
+                        title={label}
+                        onClick={() => setStatusMutation.mutate({ id: lead.id, status: key })}
+                        className={`flex h-10 w-10 items-center justify-center rounded-full border transition ${
+                          lead.status === key
+                            ? "border-transparent bg-primary text-primary-foreground"
+                            : "border-input bg-background text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </button>
+                    ))}
+                  </div>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Excluir lead"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => {
+                      if (window.confirm(`Excluir o lead "${lead.name}"?`)) {
+                        deleteLead.mutate(lead.id);
+                      }
+                    }}
                   >
-                    <option value="pendente">Pendente</option>
-                    <option value="contatado">Contatado</option>
-                    <option value="ignorado">Ignorado</option>
-                  </select>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </li>
             ))}
