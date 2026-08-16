@@ -477,6 +477,15 @@ function MapaPage() {
                         {p.name} ({p.categories.length})
                       </button>
                       <button
+                        aria-label={`Compartilhar preset ${p.name}`}
+                        title="Compartilhar preset"
+                        onClick={() =>
+                          setShareTarget({ kind: "preset", id: p.id, name: p.name })
+                        }
+                      >
+                        <Share2 className="h-3 w-3 opacity-60" />
+                      </button>
+                      <button
                         aria-label={`Excluir preset ${p.name}`}
                         onClick={() => deletePreset.mutate(p.id)}
                       >
