@@ -255,6 +255,7 @@ export type Database = {
         Args: { _preset_id: string; _user_id: string }
         Returns: boolean
       }
+      user_id_by_email: { Args: { _email: string }; Returns: string }
     }
     Enums: {
       lead_status: "pendente" | "contatado" | "ignorado"
