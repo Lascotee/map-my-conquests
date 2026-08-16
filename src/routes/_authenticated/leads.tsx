@@ -225,15 +225,13 @@ function LeadsPage() {
               size="sm"
               className="text-destructive hover:text-destructive"
               disabled={filtered.length === 0 || clearLeads.isPending}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    `Tem certeza que quer excluir ${filtered.length} lead(s) da lista atual?`,
-                  )
-                ) {
-                  clearLeads.mutate(filtered.map((l) => l.id));
-                }
-              }}
+              onClick={() =>
+                setConfirmAction({
+                  title: "Limpar lista",
+                  description: `Tem certeza que quer excluir ${filtered.length} lead(s) da lista atual?`,
+                  run: () => clearLeads.mutate(filtered.map((l) => l.id)),
+                })
+              }
             >
               <Trash2 className="mr-1.5 h-4 w-4" />
               Limpar lista
