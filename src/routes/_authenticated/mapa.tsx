@@ -85,7 +85,9 @@ function MapaPage() {
   const [categories, setCategories] = useState<string[]>([]);
   const [categoryInput, setCategoryInput] = useState("");
   const [presetName, setPresetName] = useState("");
-  const [view, setView] = useState<"meu" | "brasil">("meu");
+  const [shareTarget, setShareTarget] = useState<
+    { kind: "folder" | "preset"; id: string; name: string } | null
+  >(null);
   const [folderName, setFolderName] = useState("");
   const [openFolders, setOpenFolders] = useState<string[]>([]);
 
@@ -306,26 +308,12 @@ function MapaPage() {
     total: territories.filter((t) => t.status === s).length,
   }));
 
-  if (view === "brasil") {
-    return (
-      <ClientOnly fallback={<div className="h-screen w-full animate-pulse bg-muted" />}>
-        <Suspense fallback={<div className="h-screen w-full animate-pulse bg-muted" />}>
-          <BrasilExplorer onBack={() => setView("meu")} />
-        </Suspense>
-      </ClientOnly>
-    );
-  }
-
   return (
     <div className="flex h-screen flex-col bg-background lg:flex-row">
       <aside className="flex w-full shrink-0 flex-col border-b border-sidebar-border bg-sidebar text-sidebar-foreground lg:h-full lg:w-96 lg:border-b-0 lg:border-r">
         <div className="flex items-center justify-between px-5 py-4">
           <span className="font-display text-base font-bold">Territórios</span>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={() => setView("brasil")}>
-              <Globe2 className="mr-1.5 h-4 w-4" />
-              Brasil
-            </Button>
             <Button asChild variant="ghost" size="sm">
               <Link to="/leads">
                 <Users className="mr-1.5 h-4 w-4" />
