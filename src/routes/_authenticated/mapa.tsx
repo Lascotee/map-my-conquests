@@ -303,6 +303,7 @@ function MapaPage() {
   }
 
   const selected = territories.find((t) => t.id === selectedId) ?? null;
+  const selectedPlace = places.find((p) => p.id === selectedPlaceId) ?? null;
   const counts = STATUS_ORDER.map((s) => ({
     status: s,
     total: territories.filter((t) => t.status === s).length,
