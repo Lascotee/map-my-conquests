@@ -94,7 +94,11 @@ function LeadsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<LeadStatus | "todos">("todos");
-  const [area, setArea] = useState("todas");
+  const { area: areaParam } = Route.useSearch();
+  const [area, setArea] = useState(areaParam || "todas");
+  const [confirmAction, setConfirmAction] = useState<
+    { title: string; description: string; run: () => void } | null
+  >(null);
   const [template, setTemplate] = useState(() => {
     if (typeof window === "undefined") return DEFAULT_TEMPLATE;
     return window.localStorage.getItem(TEMPLATE_KEY) ?? DEFAULT_TEMPLATE;
