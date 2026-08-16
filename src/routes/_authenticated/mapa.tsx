@@ -637,6 +637,13 @@ function MapaPage() {
                         </span>
                       </button>
                       <button
+                        aria-label={`Compartilhar pasta ${f.name}`}
+                        title="Compartilhar pasta"
+                        onClick={() => setShareTarget({ kind: "folder", id: f.id, name: f.name })}
+                      >
+                        <Share2 className="h-3.5 w-3.5 opacity-60" />
+                      </button>
+                      <button
                         aria-label={`Excluir pasta ${f.name}`}
                         onClick={() => deleteFolder.mutate(f.id)}
                       >
