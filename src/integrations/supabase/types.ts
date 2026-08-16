@@ -41,6 +41,41 @@ export type Database = {
         }
         Relationships: []
       }
+      folder_shares: {
+        Row: {
+          created_at: string
+          folder_id: string
+          id: string
+          owner_id: string
+          shared_with: string
+          shared_with_email: string
+        }
+        Insert: {
+          created_at?: string
+          folder_id: string
+          id?: string
+          owner_id: string
+          shared_with: string
+          shared_with_email?: string
+        }
+        Update: {
+          created_at?: string
+          folder_id?: string
+          id?: string
+          owner_id?: string
+          shared_with?: string
+          shared_with_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "folder_shares_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "territory_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           address: string
@@ -106,6 +141,41 @@ export type Database = {
           website?: string | null
         }
         Relationships: []
+      }
+      preset_shares: {
+        Row: {
+          created_at: string
+          id: string
+          owner_id: string
+          preset_id: string
+          shared_with: string
+          shared_with_email: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_id: string
+          preset_id: string
+          shared_with: string
+          shared_with_email?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_id?: string
+          preset_id?: string
+          shared_with?: string
+          shared_with_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "preset_shares_preset_id_fkey"
+            columns: ["preset_id"]
+            isOneToOne: false
+            referencedRelation: "category_presets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       territories: {
         Row: {
@@ -177,7 +247,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      can_view_folder: {
+        Args: { _folder_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_view_preset: {
+        Args: { _preset_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_id_by_email: { Args: { _email: string }; Returns: string }
     }
     Enums: {
       lead_status: "pendente" | "contatado" | "ignorado"

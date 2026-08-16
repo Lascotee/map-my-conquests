@@ -9,12 +9,17 @@ import {
   ChevronRight,
   Folder,
   FolderPlus,
-  Globe2,
+  Globe,
+  Instagram,
   LogOut,
+  MapPin,
+  MessageCircle,
   PencilRuler,
+  Phone,
   Plus,
   Save,
   Search,
+  Share2,
   Sparkles,
   Star,
   Trash2,
@@ -26,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { searchArea } from "@/lib/geocode.functions";
 import { searchBoundary, type BoundaryResult } from "@/lib/boundary.functions";
 import { searchAestheticPlaces, type PlaceResult } from "@/lib/places.functions";
+import { shareFolder, sharePreset } from "@/lib/sharing.functions";
 import { boundsOf, rectPath, type Bounds } from "@/lib/geo";
 import {
   STATUS_META,
@@ -40,7 +46,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
 const TerritoryMap = lazy(() => import("@/components/TerritoryMap"));
-const BrasilExplorer = lazy(() => import("@/components/BrasilExplorer"));
 
 
 export const Route = createFileRoute("/_authenticated/mapa")({
@@ -80,7 +85,9 @@ function MapaPage() {
   const [categories, setCategories] = useState<string[]>([]);
   const [categoryInput, setCategoryInput] = useState("");
   const [presetName, setPresetName] = useState("");
-  const [view, setView] = useState<"meu" | "brasil">("meu");
+  const [shareTarget, setShareTarget] = useState<
+    { kind: "folder" | "preset"; id: string; name: string } | null
+  >(null);
   const [folderName, setFolderName] = useState("");
   const [openFolders, setOpenFolders] = useState<string[]>([]);
 
@@ -296,20 +303,11 @@ function MapaPage() {
   }
 
   const selected = territories.find((t) => t.id === selectedId) ?? null;
+  const selectedPlace = places.find((p) => p.id === selectedPlaceId) ?? null;
   const counts = STATUS_ORDER.map((s) => ({
     status: s,
     total: territories.filter((t) => t.status === s).length,
   }));
-
-  if (view === "brasil") {
-    return (
-      <ClientOnly fallback={<div className="h-screen w-full animate-pulse bg-muted" />}>
-        <Suspense fallback={<div className="h-screen w-full animate-pulse bg-muted" />}>
-          <BrasilExplorer onBack={() => setView("meu")} />
-        </Suspense>
-      </ClientOnly>
-    );
-  }
 
   return (
     <div className="flex h-screen flex-col bg-background lg:flex-row">
@@ -317,12 +315,8 @@ function MapaPage() {
         <div className="flex items-center justify-between px-5 py-4">
           <span className="font-display text-base font-bold">Territórios</span>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={() => setView("brasil")}>
-              <Globe2 className="mr-1.5 h-4 w-4" />
-              Brasil
-            </Button>
             <Button asChild variant="ghost" size="sm">
-              <Link to="/leads">
+              <Link to="/leads" search={{ area: "todas" }}>
                 <Users className="mr-1.5 h-4 w-4" />
                 Leads
               </Link>
@@ -484,6 +478,15 @@ function MapaPage() {
                         {p.name} ({p.categories.length})
                       </button>
                       <button
+                        aria-label={`Compartilhar preset ${p.name}`}
+                        title="Compartilhar preset"
+                        onClick={() =>
+                          setShareTarget({ kind: "preset", id: p.id, name: p.name })
+                        }
+                      >
+                        <Share2 className="h-3 w-3 opacity-60" />
+                      </button>
+                      <button
                         aria-label={`Excluir preset ${p.name}`}
                         onClick={() => deletePreset.mutate(p.id)}
                       >
@@ -553,15 +556,15 @@ function MapaPage() {
           {loadingPlaces && <p className="mb-3 text-sm opacity-70">Procurando comércios na área…</p>}
 
           {places.length > 0 && (
-            <div className="mb-5">
-              <div className="mb-2 flex items-center justify-between">
+            <div className="mb-5 space-y-2 rounded-lg bg-sidebar-accent px-3 py-3">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wide opacity-70">
-                  Comércios em {placeAreaName} ({places.length})
+                  {places.length} comércios em {placeAreaName}
                 </span>
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label="Limpar comércios"
+                  aria-label="Limpar comércios do mapa"
                   onClick={() => {
                     setPlaces([]);
                     setSelectedPlaceId(null);
@@ -570,32 +573,12 @@ function MapaPage() {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <Button asChild size="sm" variant="outline" className="mb-2 w-full">
-                <Link to="/leads">Abrir aba de leads</Link>
+              <Button asChild size="sm" className="w-full">
+                <Link to="/leads" search={{ area: placeAreaName }}>
+                  <Users className="mr-1.5 h-4 w-4" />
+                  Ver leads desta região
+                </Link>
               </Button>
-              <ul className="space-y-2">
-                {places.map((p) => (
-                  <li key={p.id}>
-                    <button
-                      onClick={() => setSelectedPlaceId(p.id)}
-                      className={`w-full rounded-lg px-3 py-2.5 text-left text-sm ${
-                        p.id === selectedPlaceId
-                          ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                          : "bg-sidebar-accent"
-                      }`}
-                    >
-                      <span className="block truncate font-medium">{p.name}</span>
-                      <span className="block truncate text-xs opacity-70">{p.address}</span>
-                      {p.rating !== null && (
-                        <span className="mt-1 flex items-center gap-1 text-xs opacity-80">
-                          <Star className="h-3 w-3" />
-                          {p.rating.toFixed(1)} · {p.reviews ?? 0} avaliações
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ul>
             </div>
           )}
 
@@ -653,6 +636,13 @@ function MapaPage() {
                         <span className="ml-auto shrink-0 text-[11px] opacity-60">
                           {items.length}
                         </span>
+                      </button>
+                      <button
+                        aria-label={`Compartilhar pasta ${f.name}`}
+                        title="Compartilhar pasta"
+                        onClick={() => setShareTarget({ kind: "folder", id: f.id, name: f.name })}
+                      >
+                        <Share2 className="h-3.5 w-3.5 opacity-60" />
                       </button>
                       <button
                         aria-label={`Excluir pasta ${f.name}`}
@@ -860,10 +850,217 @@ function MapaPage() {
             </div>
           </div>
         )}
+
+        {selectedPlace && (
+          <div className="absolute bottom-4 left-4 w-[min(22rem,calc(100%-2rem))] rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-lg">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-card-foreground">{selectedPlace.name}</p>
+                <p className="flex items-start gap-1 text-xs text-muted-foreground">
+                  <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
+                  <span className="min-w-0">{selectedPlace.address}</span>
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Fechar"
+                onClick={() => setSelectedPlaceId(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
+              {selectedPlace.rating !== null && (
+                <span className="flex items-center gap-1">
+                  <Star className="h-3 w-3" />
+                  {selectedPlace.rating.toFixed(1)} · {selectedPlace.reviews ?? 0} avaliações
+                </span>
+              )}
+              <span className="flex items-center gap-1">
+                <Phone className="h-3 w-3" />
+                {selectedPlace.phone ?? "sem telefone"}
+              </span>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {selectedPlace.phone && (
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    window.open(
+                      `https://wa.me/${whatsappNumber(selectedPlace.phone!)}`,
+                      "_blank",
+                      "noopener,noreferrer",
+                    )
+                  }
+                >
+                  <MessageCircle className="mr-1.5 h-4 w-4" />
+                  WhatsApp
+                </Button>
+              )}
+              {selectedPlace.website && (
+                <Button size="sm" variant="outline" asChild>
+                  <a href={selectedPlace.website} target="_blank" rel="noopener noreferrer">
+                    <Globe className="mr-1.5 h-4 w-4" />
+                    Site
+                  </a>
+                </Button>
+              )}
+              {selectedPlace.instagram && (
+                <Button size="sm" variant="outline" asChild>
+                  <a href={selectedPlace.instagram} target="_blank" rel="noopener noreferrer">
+                    <Instagram className="mr-1.5 h-4 w-4" />
+                    Instagram
+                  </a>
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {shareTarget && (
+        <ShareDialog target={shareTarget} onClose={() => setShareTarget(null)} />
+      )}
+    </div>
+  );
+}
+
+function whatsappNumber(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length <= 11 ? `55${digits}` : digits;
+}
+
+function ShareDialog({
+  target,
+  onClose,
+}: {
+  target: { kind: "folder" | "preset"; id: string; name: string };
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [email, setEmail] = useState("");
+  const runShareFolder = useServerFn(shareFolder);
+  const runSharePreset = useServerFn(sharePreset);
+  const table = target.kind === "folder" ? "folder_shares" : "preset_shares";
+
+  const { data: shares = [] } = useQuery({
+    queryKey: ["shares", table, target.id],
+    queryFn: async (): Promise<{ id: string; shared_with_email: string }[]> => {
+      const query =
+        target.kind === "folder"
+          ? supabase.from("folder_shares").select("id, shared_with_email").eq("folder_id", target.id)
+          : supabase.from("preset_shares").select("id, shared_with_email").eq("preset_id", target.id);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["shares", table, target.id] });
+
+  const share = useMutation({
+    mutationFn: async () => {
+      const payload = { data: { id: target.id, email } };
+      if (target.kind === "folder") await runShareFolder(payload);
+      else await runSharePreset(payload);
+    },
+    onSuccess: async () => {
+      setEmail("");
+      await invalidate();
+      toast.success("Compartilhado com sucesso");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao compartilhar"),
+  });
+
+  const revoke = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from(table).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await invalidate();
+      toast.success("Acesso removido");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao remover acesso"),
+  });
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h2 className="font-display text-base font-bold">
+              Compartilhar {target.kind === "folder" ? "pasta" : "preset"}
+            </h2>
+            <p className="text-xs text-muted-foreground">{target.name}</p>
+          </div>
+          <Button variant="ghost" size="icon" aria-label="Fechar" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <Label htmlFor="share-email">E-mail da conta</Label>
+          <div className="flex gap-2">
+            <Input
+              id="share-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="pessoa@email.com"
+            />
+            <Button disabled={share.isPending || !email.trim()} onClick={() => share.mutate()}>
+              <Share2 className="mr-1.5 h-4 w-4" />
+              Compartilhar
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            A pessoa precisa já ter uma conta neste site. Ela poderá visualizar, mas não editar.
+          </p>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <Label>Com acesso</Label>
+          {shares.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Ninguém além de você.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {shares.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                >
+                  <span className="truncate">{s.shared_with_email}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remover acesso de ${s.shared_with_email}`}
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => revoke.mutate(s.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );
 }
+
 
 function TerritoryRow({
   territory,

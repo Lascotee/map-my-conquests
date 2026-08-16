@@ -24,6 +24,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/_authenticated/leads")({
+  validateSearch: (search: Record<string, unknown>): { area: string } => ({
+    area: typeof search["area"] === "string" ? search["area"] : "todas",
+  }),
   head: () => ({
     meta: [
       { title: "Leads WhatsApp — comércios mapeados" },
@@ -91,7 +94,11 @@ function LeadsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<LeadStatus | "todos">("todos");
-  const [area, setArea] = useState("todas");
+  const { area: areaParam } = Route.useSearch();
+  const [area, setArea] = useState(areaParam || "todas");
+  const [confirmAction, setConfirmAction] = useState<
+    { title: string; description: string; run: () => void } | null
+  >(null);
   const [template, setTemplate] = useState(() => {
     if (typeof window === "undefined") return DEFAULT_TEMPLATE;
     return window.localStorage.getItem(TEMPLATE_KEY) ?? DEFAULT_TEMPLATE;
@@ -218,15 +225,13 @@ function LeadsPage() {
               size="sm"
               className="text-destructive hover:text-destructive"
               disabled={filtered.length === 0 || clearLeads.isPending}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    `Tem certeza que quer excluir ${filtered.length} lead(s) da lista atual?`,
-                  )
-                ) {
-                  clearLeads.mutate(filtered.map((l) => l.id));
-                }
-              }}
+              onClick={() =>
+                setConfirmAction({
+                  title: "Limpar lista",
+                  description: `Tem certeza que quer excluir ${filtered.length} lead(s) da lista atual?`,
+                  run: () => clearLeads.mutate(filtered.map((l) => l.id)),
+                })
+              }
             >
               <Trash2 className="mr-1.5 h-4 w-4" />
               Limpar lista
@@ -434,11 +439,13 @@ function LeadsPage() {
                     size="icon"
                     aria-label="Excluir lead"
                     className="text-destructive hover:text-destructive"
-                    onClick={() => {
-                      if (window.confirm(`Excluir o lead "${lead.name}"?`)) {
-                        deleteLead.mutate(lead.id);
-                      }
-                    }}
+                    onClick={() =>
+                      setConfirmAction({
+                        title: "Excluir lead",
+                        description: `Excluir o lead "${lead.name}"? Essa ação não pode ser desfeita.`,
+                        run: () => deleteLead.mutate(lead.id),
+                      })
+                    }
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -448,6 +455,38 @@ function LeadsPage() {
           </ul>
         )}
       </main>
+
+      {confirmAction && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setConfirmAction(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="font-display text-base font-bold">{confirmAction.title}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{confirmAction.description}</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setConfirmAction(null)}>
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  confirmAction.run();
+                  setConfirmAction(null);
+                }}
+              >
+                Excluir
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

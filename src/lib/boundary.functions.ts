@@ -72,7 +72,21 @@ export const searchBoundary = createServerFn({ method: "POST" })
     const items = (await res.json()) as NominatimItem[];
     const out: BoundaryResult[] = [];
 
+    // Só bairro/cidade: nada de estado, região ou país (áreas grandes demais).
+    const BLOCKED = new Set([
+      "state",
+      "state_district",
+      "region",
+      "country",
+      "continent",
+      "province",
+      "territory",
+      "county",
+    ]);
+
     for (const item of items) {
+      const kind = (item.addresstype ?? item.type ?? "").toLowerCase();
+      if (BLOCKED.has(kind)) continue;
       const path = largestRing(item.geojson);
       const bb = item.boundingbox;
       const fallbackBounds: Bounds | null = bb
