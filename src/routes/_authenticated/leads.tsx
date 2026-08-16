@@ -24,6 +24,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/_authenticated/leads")({
+  validateSearch: (search: Record<string, unknown>): { area?: string } => ({
+    area: typeof search.area === "string" && search.area ? search.area : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Leads WhatsApp — comércios mapeados" },
