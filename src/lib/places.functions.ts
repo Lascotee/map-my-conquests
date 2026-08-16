@@ -28,6 +28,8 @@ type ApiPlace = {
   userRatingCount?: number;
   nationalPhoneNumber?: string;
   websiteUri?: string;
+  types?: string[];
+  primaryTypeDisplayName?: { text?: string };
 };
 
 const FIELD_MASK = [
@@ -39,7 +41,69 @@ const FIELD_MASK = [
   "places.userRatingCount",
   "places.nationalPhoneNumber",
   "places.websiteUri",
+  "places.types",
+  "places.primaryTypeDisplayName",
 ].join(",");
+
+function normalize(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+/** Sinônimos PT-BR -> tipos do Google Places. */
+const TYPE_HINTS: Record<string, string[]> = {
+  dentista: ["dentist", "dental"],
+  odontolog: ["dentist", "dental"],
+  farmacia: ["pharmacy", "drugstore"],
+  restaurante: ["restaurant"],
+  lanchonete: ["restaurant", "meal"],
+  cafeteria: ["cafe", "coffee"],
+  academia: ["gym", "fitness"],
+  barbearia: ["barber"],
+  cabeleireiro: ["hair"],
+  salao: ["beauty_salon", "hair"],
+  estetica: ["beauty", "spa", "skin"],
+  spa: ["spa"],
+  clinica: ["doctor", "clinic", "medical", "hospital"],
+  medic: ["doctor", "medical"],
+  veterinar: ["veterinary"],
+  petshop: ["pet_store"],
+  tatuagem: ["tattoo"],
+  advogad: ["lawyer"],
+  imobiliaria: ["real_estate"],
+  otica: ["optician"],
+  nutricion: ["nutrition", "doctor"],
+  fisioterap: ["physiotherapist"],
+  psicolog: ["psychologist", "doctor"],
+};
+
+/** Mantém apenas comércios que combinam com a categoria pesquisada. */
+function matchesCategory(place: ApiPlace, category: string): boolean {
+  const terms = normalize(category)
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 4);
+  if (terms.length === 0) return true;
+
+  const haystack = normalize(
+    [
+      place.displayName?.text ?? "",
+      place.primaryTypeDisplayName?.text ?? "",
+      (place.types ?? []).join(" "),
+    ].join(" "),
+  );
+
+  return terms.some((term) => {
+    if (haystack.includes(term)) return true;
+    const stem = term.slice(0, 6);
+    for (const [key, hints] of Object.entries(TYPE_HINTS)) {
+      if (!term.startsWith(key.slice(0, 6)) && !key.startsWith(stem)) continue;
+      if (hints.some((h) => haystack.includes(h))) return true;
+    }
+    return false;
+  });
+}
 
 function cityFromAddress(address: string): string {
   const parts = address.split(",").map((p) => p.trim());
@@ -113,6 +177,7 @@ export const searchAestheticPlaces = createServerFn({ method: "POST" })
         if (!p.id || !p.location) continue;
         const loc = { lat: p.location.latitude, lng: p.location.longitude };
         if (!pointInPolygon(loc, data.polygon)) continue;
+        if (!matchesCategory(p, textQuery)) continue;
         const existing = found.get(p.id);
         if (existing) {
           if (!existing.matched.includes(textQuery)) existing.matched.push(textQuery);
