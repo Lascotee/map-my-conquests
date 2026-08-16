@@ -316,7 +316,7 @@ function MapaPage() {
           <span className="font-display text-base font-bold">Territórios</span>
           <div className="flex items-center gap-1">
             <Button asChild variant="ghost" size="sm">
-              <Link to="/leads">
+              <Link to="/leads" search={{ area: "todas" }}>
                 <Users className="mr-1.5 h-4 w-4" />
                 Leads
               </Link>
