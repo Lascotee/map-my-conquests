@@ -9,12 +9,17 @@ import {
   ChevronRight,
   Folder,
   FolderPlus,
-  Globe2,
+  Globe,
+  Instagram,
   LogOut,
+  MapPin,
+  MessageCircle,
   PencilRuler,
+  Phone,
   Plus,
   Save,
   Search,
+  Share2,
   Sparkles,
   Star,
   Trash2,
@@ -26,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { searchArea } from "@/lib/geocode.functions";
 import { searchBoundary, type BoundaryResult } from "@/lib/boundary.functions";
 import { searchAestheticPlaces, type PlaceResult } from "@/lib/places.functions";
+import { shareFolder, sharePreset } from "@/lib/sharing.functions";
 import { boundsOf, rectPath, type Bounds } from "@/lib/geo";
 import {
   STATUS_META,
@@ -40,7 +46,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
 const TerritoryMap = lazy(() => import("@/components/TerritoryMap"));
-const BrasilExplorer = lazy(() => import("@/components/BrasilExplorer"));
 
 
 export const Route = createFileRoute("/_authenticated/mapa")({
