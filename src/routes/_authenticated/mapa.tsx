@@ -849,10 +849,217 @@ function MapaPage() {
             </div>
           </div>
         )}
+
+        {selectedPlace && (
+          <div className="absolute bottom-4 left-4 w-[min(22rem,calc(100%-2rem))] rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-lg">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-card-foreground">{selectedPlace.name}</p>
+                <p className="flex items-start gap-1 text-xs text-muted-foreground">
+                  <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
+                  <span className="min-w-0">{selectedPlace.address}</span>
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Fechar"
+                onClick={() => setSelectedPlaceId(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
+              {selectedPlace.rating !== null && (
+                <span className="flex items-center gap-1">
+                  <Star className="h-3 w-3" />
+                  {selectedPlace.rating.toFixed(1)} · {selectedPlace.reviews ?? 0} avaliações
+                </span>
+              )}
+              <span className="flex items-center gap-1">
+                <Phone className="h-3 w-3" />
+                {selectedPlace.phone ?? "sem telefone"}
+              </span>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {selectedPlace.phone && (
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    window.open(
+                      `https://wa.me/${whatsappNumber(selectedPlace.phone!)}`,
+                      "_blank",
+                      "noopener,noreferrer",
+                    )
+                  }
+                >
+                  <MessageCircle className="mr-1.5 h-4 w-4" />
+                  WhatsApp
+                </Button>
+              )}
+              {selectedPlace.website && (
+                <Button size="sm" variant="outline" asChild>
+                  <a href={selectedPlace.website} target="_blank" rel="noopener noreferrer">
+                    <Globe className="mr-1.5 h-4 w-4" />
+                    Site
+                  </a>
+                </Button>
+              )}
+              {selectedPlace.instagram && (
+                <Button size="sm" variant="outline" asChild>
+                  <a href={selectedPlace.instagram} target="_blank" rel="noopener noreferrer">
+                    <Instagram className="mr-1.5 h-4 w-4" />
+                    Instagram
+                  </a>
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {shareTarget && (
+        <ShareDialog target={shareTarget} onClose={() => setShareTarget(null)} />
+      )}
+    </div>
+  );
+}
+
+function whatsappNumber(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length <= 11 ? `55${digits}` : digits;
+}
+
+function ShareDialog({
+  target,
+  onClose,
+}: {
+  target: { kind: "folder" | "preset"; id: string; name: string };
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [email, setEmail] = useState("");
+  const runShareFolder = useServerFn(shareFolder);
+  const runSharePreset = useServerFn(sharePreset);
+  const table = target.kind === "folder" ? "folder_shares" : "preset_shares";
+  const column = target.kind === "folder" ? "folder_id" : "preset_id";
+
+  const { data: shares = [] } = useQuery({
+    queryKey: ["shares", table, target.id],
+    queryFn: async (): Promise<{ id: string; shared_with_email: string }[]> => {
+      const { data, error } = await supabase
+        .from(table)
+        .select("id, shared_with_email")
+        .eq(column, target.id);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["shares", table, target.id] });
+
+  const share = useMutation({
+    mutationFn: async () => {
+      const payload = { data: { id: target.id, email } };
+      if (target.kind === "folder") await runShareFolder(payload);
+      else await runSharePreset(payload);
+    },
+    onSuccess: async () => {
+      setEmail("");
+      await invalidate();
+      toast.success("Compartilhado com sucesso");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao compartilhar"),
+  });
+
+  const revoke = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from(table).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await invalidate();
+      toast.success("Acesso removido");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao remover acesso"),
+  });
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h2 className="font-display text-base font-bold">
+              Compartilhar {target.kind === "folder" ? "pasta" : "preset"}
+            </h2>
+            <p className="text-xs text-muted-foreground">{target.name}</p>
+          </div>
+          <Button variant="ghost" size="icon" aria-label="Fechar" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <Label htmlFor="share-email">E-mail da conta</Label>
+          <div className="flex gap-2">
+            <Input
+              id="share-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="pessoa@email.com"
+            />
+            <Button disabled={share.isPending || !email.trim()} onClick={() => share.mutate()}>
+              <Share2 className="mr-1.5 h-4 w-4" />
+              Compartilhar
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            A pessoa precisa já ter uma conta neste site. Ela poderá visualizar, mas não editar.
+          </p>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <Label>Com acesso</Label>
+          {shares.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Ninguém além de você.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {shares.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                >
+                  <span className="truncate">{s.shared_with_email}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remover acesso de ${s.shared_with_email}`}
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => revoke.mutate(s.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );
 }
+
 
 function TerritoryRow({
   territory,
