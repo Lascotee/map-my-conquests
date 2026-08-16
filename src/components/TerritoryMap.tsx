@@ -41,7 +41,7 @@ export default function TerritoryMap({
   const mapRef = useRef<google.maps.Map | null>(null);
   const shapesRef = useRef<Map<string, google.maps.Polygon>>(new Map());
   const placeMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
-  const infoRef = useRef<google.maps.InfoWindow | null>(null);
+  
   const previewRef = useRef<google.maps.Polygon | null>(null);
   const draftRef = useRef<LatLngLiteral[]>([]);
   const draftShapeRef = useRef<google.maps.Polygon | null>(null);
