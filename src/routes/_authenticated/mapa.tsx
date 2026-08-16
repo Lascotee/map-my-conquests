@@ -945,15 +945,15 @@ function ShareDialog({
   const runShareFolder = useServerFn(shareFolder);
   const runSharePreset = useServerFn(sharePreset);
   const table = target.kind === "folder" ? "folder_shares" : "preset_shares";
-  const column = target.kind === "folder" ? "folder_id" : "preset_id";
 
   const { data: shares = [] } = useQuery({
     queryKey: ["shares", table, target.id],
     queryFn: async (): Promise<{ id: string; shared_with_email: string }[]> => {
-      const { data, error } = await supabase
-        .from(table)
-        .select("id, shared_with_email")
-        .eq(column, target.id);
+      const query =
+        target.kind === "folder"
+          ? supabase.from("folder_shares").select("id, shared_with_email").eq("folder_id", target.id)
+          : supabase.from("preset_shares").select("id, shared_with_email").eq("preset_id", target.id);
+      const { data, error } = await query;
       if (error) throw error;
       return data ?? [];
     },
