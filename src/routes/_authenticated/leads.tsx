@@ -439,11 +439,13 @@ function LeadsPage() {
                     size="icon"
                     aria-label="Excluir lead"
                     className="text-destructive hover:text-destructive"
-                    onClick={() => {
-                      if (window.confirm(`Excluir o lead "${lead.name}"?`)) {
-                        deleteLead.mutate(lead.id);
-                      }
-                    }}
+                    onClick={() =>
+                      setConfirmAction({
+                        title: "Excluir lead",
+                        description: `Excluir o lead "${lead.name}"? Essa ação não pode ser desfeita.`,
+                        run: () => deleteLead.mutate(lead.id),
+                      })
+                    }
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -453,6 +455,38 @@ function LeadsPage() {
           </ul>
         )}
       </main>
+
+      {confirmAction && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setConfirmAction(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="font-display text-base font-bold">{confirmAction.title}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{confirmAction.description}</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setConfirmAction(null)}>
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  confirmAction.run();
+                  setConfirmAction(null);
+                }}
+              >
+                Excluir
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
