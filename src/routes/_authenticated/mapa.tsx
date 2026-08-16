@@ -546,15 +546,15 @@ function MapaPage() {
           {loadingPlaces && <p className="mb-3 text-sm opacity-70">Procurando comércios na área…</p>}
 
           {places.length > 0 && (
-            <div className="mb-5">
-              <div className="mb-2 flex items-center justify-between">
+            <div className="mb-5 space-y-2 rounded-lg bg-sidebar-accent px-3 py-3">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wide opacity-70">
-                  Comércios em {placeAreaName} ({places.length})
+                  {places.length} comércios em {placeAreaName}
                 </span>
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label="Limpar comércios"
+                  aria-label="Limpar comércios do mapa"
                   onClick={() => {
                     setPlaces([]);
                     setSelectedPlaceId(null);
@@ -563,32 +563,12 @@ function MapaPage() {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <Button asChild size="sm" variant="outline" className="mb-2 w-full">
-                <Link to="/leads">Abrir aba de leads</Link>
+              <Button asChild size="sm" className="w-full">
+                <Link to="/leads" search={{ area: placeAreaName }}>
+                  <Users className="mr-1.5 h-4 w-4" />
+                  Ver leads desta região
+                </Link>
               </Button>
-              <ul className="space-y-2">
-                {places.map((p) => (
-                  <li key={p.id}>
-                    <button
-                      onClick={() => setSelectedPlaceId(p.id)}
-                      className={`w-full rounded-lg px-3 py-2.5 text-left text-sm ${
-                        p.id === selectedPlaceId
-                          ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                          : "bg-sidebar-accent"
-                      }`}
-                    >
-                      <span className="block truncate font-medium">{p.name}</span>
-                      <span className="block truncate text-xs opacity-70">{p.address}</span>
-                      {p.rating !== null && (
-                        <span className="mt-1 flex items-center gap-1 text-xs opacity-80">
-                          <Star className="h-3 w-3" />
-                          {p.rating.toFixed(1)} · {p.reviews ?? 0} avaliações
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ul>
             </div>
           )}
 
