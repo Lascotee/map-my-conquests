@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AuthenticatedBrasilRouteImport } from './routes/_authenticated/brasil'
 import { Route as AuthenticatedLeadsRouteImport } from './routes/_authenticated/leads'
 import { Route as AuthenticatedMapaRouteImport } from './routes/_authenticated/mapa'
 
@@ -30,11 +29,6 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedBrasilRoute = AuthenticatedBrasilRouteImport.update({
-  id: '/brasil',
-  path: '/brasil',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedLeadsRoute = AuthenticatedLeadsRouteImport.update({
   id: '/leads',
   path: '/leads',
@@ -49,14 +43,12 @@ const AuthenticatedMapaRoute = AuthenticatedMapaRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/brasil': typeof AuthenticatedBrasilRoute
   '/leads': typeof AuthenticatedLeadsRoute
   '/mapa': typeof AuthenticatedMapaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/brasil': typeof AuthenticatedBrasilRoute
   '/leads': typeof AuthenticatedLeadsRoute
   '/mapa': typeof AuthenticatedMapaRoute
 }
@@ -65,21 +57,19 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
-  '/_authenticated/brasil': typeof AuthenticatedBrasilRoute
   '/_authenticated/leads': typeof AuthenticatedLeadsRoute
   '/_authenticated/mapa': typeof AuthenticatedMapaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/brasil' | '/leads' | '/mapa'
+  fullPaths: '/' | '/auth' | '/leads' | '/mapa'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/brasil' | '/leads' | '/mapa'
+  to: '/' | '/auth' | '/leads' | '/mapa'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
-    | '/_authenticated/brasil'
     | '/_authenticated/leads'
     | '/_authenticated/mapa'
   fileRoutesById: FileRoutesById
@@ -113,13 +103,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/brasil': {
-      id: '/_authenticated/brasil'
-      path: '/brasil'
-      fullPath: '/brasil'
-      preLoaderRoute: typeof AuthenticatedBrasilRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/leads': {
       id: '/_authenticated/leads'
       path: '/leads'
@@ -138,13 +121,11 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedBrasilRoute: typeof AuthenticatedBrasilRoute
   AuthenticatedLeadsRoute: typeof AuthenticatedLeadsRoute
   AuthenticatedMapaRoute: typeof AuthenticatedMapaRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedBrasilRoute: AuthenticatedBrasilRoute,
   AuthenticatedLeadsRoute: AuthenticatedLeadsRoute,
   AuthenticatedMapaRoute: AuthenticatedMapaRoute,
 }
