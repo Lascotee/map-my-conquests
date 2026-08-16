@@ -268,33 +268,12 @@ export default function TerritoryMap({
     }
   }, [places, selectedPlaceId]);
 
+  // Ao selecionar um comércio, apenas centraliza o mapa: os detalhes aparecem
+  // num painel próprio da aplicação (sem InfoWindow do Google).
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !window.google) return;
     const place = places.find((p) => p.id === selectedPlaceId);
-    if (!place) {
-      infoRef.current?.close();
-      return;
-    }
-    if (!infoRef.current) infoRef.current = new window.google.maps.InfoWindow();
-    const div = document.createElement("div");
-    div.style.maxWidth = "220px";
-    div.style.fontFamily = "inherit";
-    const title = document.createElement("strong");
-    title.textContent = place.name;
-    const addr = document.createElement("div");
-    addr.style.fontSize = "12px";
-    addr.textContent = place.address;
-    div.append(title, addr);
-    if (place.rating) {
-      const r = document.createElement("div");
-      r.style.fontSize = "12px";
-      r.textContent = `★ ${place.rating.toFixed(1)} (${place.reviews ?? 0})`;
-      div.append(r);
-    }
-    infoRef.current.setContent(div);
-    infoRef.current.setPosition(place.location);
-    infoRef.current.open({ map });
+    if (!map || !place) return;
     map.panTo(place.location);
   }, [selectedPlaceId, places]);
 
