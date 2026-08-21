@@ -115,7 +115,6 @@
   --shadow-glow: 0 18px 50px -22px oklch(0.63 0.26 305 / 65%);
 }
 
-
 .dark {
   color-scheme: dark;
 }
@@ -144,7 +143,6 @@
   }
 }
 
-
 @utility glass {
   background-color: oklch(0.99 0 0 / 6%);
   backdrop-filter: blur(14px);
@@ -154,6 +152,10 @@
 @utility gradient-neon {
   background-image: var(--gradient-neon);
   color: oklch(0.16 0.05 274);
+}
+
+@utility bg-radial-vignette {
+  background-image: radial-gradient(circle at center, transparent 20%, #030308 90%);
 }
 
 @layer base {

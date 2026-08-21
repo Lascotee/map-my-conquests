@@ -116,16 +116,18 @@ function cityFromAddress(address: string): string {
 
 export const searchAestheticPlaces = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { polygon: LatLng[]; categories?: string[]; areaName?: string }) => {
+  .validator((input: { polygon: LatLng[]; categories?: string[]; areaName?: string }) => {
     const polygon = Array.isArray(input?.polygon) ? input.polygon : [];
-    const valid = polygon.every(
-      (p) => Number.isFinite(p?.lat) && Number.isFinite(p?.lng),
-    );
+    const valid = polygon.every((p) => Number.isFinite(p?.lat) && Number.isFinite(p?.lng));
     if (polygon.length < 3 || !valid) throw new Error("Área inválida para busca");
-    const categories = (input.categories ?? [])
-      .map((c) => String(c).trim().slice(0, 80))
-      .filter(Boolean)
-      .slice(0, 40);
+    if (polygon.length > 3000) throw new Error("Esta área é detalhada demais para a busca");
+    const categories = [
+      ...new Set(
+        (input.categories ?? [])
+          .map((category) => String(category).trim().slice(0, 80))
+          .filter(Boolean),
+      ),
+    ].slice(0, 8);
     return {
       polygon,
       categories,
@@ -134,8 +136,15 @@ export const searchAestheticPlaces = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }): Promise<PlaceResult[]> => {
     const lovableKey = process.env["LOVABLE_API_KEY"];
-    const mapsKey = process.env["GOOGLE_MAPS_API_KEY"];
-    if (!lovableKey || !mapsKey) throw new Error("Google Maps não está configurado");
+    const mapsKey =
+      process.env["GOOGLE_MAPS_API_KEY"] ||
+      process.env["VITE_GOOGLE_MAPS_API_KEY"] ||
+      process.env["VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY"] ||
+      process.env["GOOGLE_MAPS_BROWSER_KEY"];
+
+    if (!mapsKey && !lovableKey) {
+      throw new Error("Chave do Google Maps não está configurada");
+    }
 
     const b = boundsOf(data.polygon);
     const rectangle = {
@@ -146,14 +155,26 @@ export const searchAestheticPlaces = createServerFn({ method: "POST" })
     const found = new Map<string, PlaceResult>();
 
     async function runQuery(textQuery: string) {
-      const res = await fetch(`${GATEWAY_URL}/places/v1/places:searchText`, {
-        method: "POST",
-        headers: {
+      let url = "https://places.googleapis.com/v1/places:searchText";
+      let headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "X-Goog-FieldMask": FIELD_MASK,
+        "X-Goog-Api-Key": mapsKey || "",
+      };
+
+      if (lovableKey && mapsKey && !mapsKey.startsWith("AIzaSy")) {
+        url = `${GATEWAY_URL}/places/v1/places:searchText`;
+        headers = {
           Authorization: `Bearer ${lovableKey}`,
-          "X-Connection-Api-Key": mapsKey!,
+          "X-Connection-Api-Key": mapsKey,
           "Content-Type": "application/json",
           "X-Goog-FieldMask": FIELD_MASK,
-        },
+        };
+      }
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers,
         body: JSON.stringify({
           textQuery,
           languageCode: "pt-BR",
@@ -202,7 +223,7 @@ export const searchAestheticPlaces = createServerFn({ method: "POST" })
     }
 
     const queue = data.categories.length ? [...data.categories] : [...AESTHETIC_QUERIES];
-    const workers = Array.from({ length: 6 }, async () => {
+    const workers = Array.from({ length: 2 }, async () => {
       for (;;) {
         const next = queue.shift();
         if (!next) return;
@@ -219,7 +240,10 @@ export const searchAestheticPlaces = createServerFn({ method: "POST" })
       const { data: existing } = await context.supabase
         .from("leads")
         .select("place_id, status")
-        .in("place_id", results.map((r) => r.id));
+        .in(
+          "place_id",
+          results.map((r) => r.id),
+        );
       const statusById = new Map((existing ?? []).map((l) => [l.place_id, l.status]));
       const { error } = await context.supabase.from("leads").upsert(
         results.map((r) => ({

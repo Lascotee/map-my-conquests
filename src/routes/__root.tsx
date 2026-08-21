@@ -13,7 +13,6 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 
-
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -79,15 +78,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Territórios — mapa de regiões cobertas" },
+      { title: "Prospect — Radar de Conquistas & Inteligência Territorial" },
       {
         name: "description",
-        content: "Marque no mapa os bairros e áreas que você já cobriu e acompanhe o progresso.",
+        content: "Prospecte e mapeie territórios comerciais, bairros e áreas dominadas em tempo real.",
       },
-      { property: "og:title", content: "Territórios — mapa de regiões cobertas" },
+      { property: "og:title", content: "Prospect — Radar de Conquistas" },
       {
         property: "og:description",
-        content: "Marque no mapa os bairros e áreas que você já cobriu e acompanhe o progresso.",
+        content: "Prospecte e mapeie territórios comerciais, bairros e áreas dominadas em tempo real.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -103,7 +102,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap",
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/logo-icon.png", type: "image/png" },
+      { rel: "shortcut icon", href: "/logo-icon.png", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/logo-icon.png" },
     ],
   }),
 
@@ -138,4 +139,3 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
-

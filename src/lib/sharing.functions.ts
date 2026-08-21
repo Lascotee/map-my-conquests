@@ -5,8 +5,13 @@ type ShareInput = { id: string; email: string };
 
 function parse(input: ShareInput) {
   const id = String(input?.id ?? "").trim();
-  const email = String(input?.email ?? "").trim().toLowerCase();
+  const email = String(input?.email ?? "")
+    .trim()
+    .toLowerCase();
   if (!id) throw new Error("Item inválido");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    throw new Error("Item inválido");
+  }
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("E-mail inválido");
   return { id, email };
 }
@@ -21,7 +26,7 @@ async function resolveUser(email: string): Promise<string> {
 
 export const shareFolder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(parse)
+  .validator(parse)
   .handler(async ({ data, context }) => {
     const { data: folder, error: fErr } = await context.supabase
       .from("territory_folders")
@@ -49,7 +54,7 @@ export const shareFolder = createServerFn({ method: "POST" })
 
 export const sharePreset = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(parse)
+  .validator(parse)
   .handler(async ({ data, context }) => {
     const { data: preset, error: pErr } = await context.supabase
       .from("category_presets")

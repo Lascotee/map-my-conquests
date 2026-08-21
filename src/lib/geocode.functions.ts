@@ -11,25 +11,39 @@ export type GeocodeResult = {
 
 export const searchArea = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { query: string }) => {
-    const query = String(input?.query ?? "").trim().slice(0, 200);
+  .validator((input: { query: string }) => {
+    const query = String(input?.query ?? "")
+      .trim()
+      .slice(0, 200);
     if (query.length < 2) throw new Error("Digite pelo menos 2 caracteres");
     return { query };
   })
   .handler(async ({ data }): Promise<GeocodeResult[]> => {
     const lovableKey = process.env["LOVABLE_API_KEY"];
-    const mapsKey = process.env["GOOGLE_MAPS_API_KEY"];
-    if (!lovableKey || !mapsKey) throw new Error("Google Maps não está configurado");
+    const mapsKey =
+      process.env["GOOGLE_MAPS_API_KEY"] ||
+      process.env["VITE_GOOGLE_MAPS_API_KEY"] ||
+      process.env["VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY"] ||
+      process.env["GOOGLE_MAPS_BROWSER_KEY"];
 
-    const res = await fetch(
-      `${GATEWAY_URL}/maps/api/geocode/json?language=pt-BR&region=br&address=${encodeURIComponent(data.query)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${lovableKey}`,
-          "X-Connection-Api-Key": mapsKey,
-        },
-      },
-    );
+    if (!mapsKey && !lovableKey) {
+      throw new Error("Chave do Google Maps não está configurada");
+    }
+
+    let url: string;
+    let headers: Record<string, string> = {};
+
+    if (lovableKey && mapsKey && !mapsKey.startsWith("AIzaSy")) {
+      url = `${GATEWAY_URL}/maps/api/geocode/json?language=pt-BR&region=br&address=${encodeURIComponent(data.query)}`;
+      headers = {
+        Authorization: `Bearer ${lovableKey}`,
+        "X-Connection-Api-Key": mapsKey,
+      };
+    } else {
+      url = `https://maps.googleapis.com/maps/api/geocode/json?language=pt-BR&region=br&address=${encodeURIComponent(data.query)}&key=${mapsKey}`;
+    }
+
+    const res = await fetch(url, { headers });
 
     if (!res.ok) {
       const body = await res.text();
@@ -43,8 +57,14 @@ export const searchArea = createServerFn({ method: "POST" })
         formatted_address: string;
         geometry: {
           location: { lat: number; lng: number };
-          bounds?: { northeast: { lat: number; lng: number }; southwest: { lat: number; lng: number } };
-          viewport: { northeast: { lat: number; lng: number }; southwest: { lat: number; lng: number } };
+          bounds?: {
+            northeast: { lat: number; lng: number };
+            southwest: { lat: number; lng: number };
+          };
+          viewport: {
+            northeast: { lat: number; lng: number };
+            southwest: { lat: number; lng: number };
+          };
         };
       }>;
     };

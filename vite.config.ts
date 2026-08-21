@@ -7,14 +7,12 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
-  tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
-    server: { entry: "server" },
-  },
-  vite: {
-    // maplibre-gl ships its own web worker; pre-bundling it breaks the worker URL in dev
-    optimizeDeps: { exclude: ["maplibre-gl"] },
-  },
+  // Generate Vercel's Build Output API layout instead of the Lovable default
+  // Cloudflare Worker bundle.
+  nitro: {
+    preset: "vercel",
+    // Nitro v3 beta can create circular SSR chunks for this dependency graph.
+    // A single server bundle avoids invalid cross-chunk exports on Vercel.
+    inlineDynamicImports: true,
+  } as { preset: string },
 });
-

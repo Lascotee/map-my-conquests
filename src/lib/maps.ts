@@ -9,26 +9,49 @@ export function loadGoogleMaps(): Promise<typeof google.maps> {
   if (loadPromise) return loadPromise;
 
   loadPromise = new Promise((resolve, reject) => {
-    const key = import.meta.env["VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY"];
-    const channel = import.meta.env["VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID"] ?? "";
+    const key =
+      import.meta.env["VITE_GOOGLE_MAPS_API_KEY"] ||
+      import.meta.env["VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY"] ||
+      import.meta.env["GOOGLE_MAPS_BROWSER_KEY"] ||
+      (window as unknown as { GOOGLE_MAPS_API_KEY?: string }).GOOGLE_MAPS_API_KEY;
+    const channel =
+      import.meta.env["VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID"] ||
+      import.meta.env["VITE_GOOGLE_MAPS_TRACKING_ID"] ||
+      "";
+
     if (!key) {
-      reject(new Error("Chave do Google Maps indisponível"));
+      reject(
+        new Error(
+          "Chave do Google Maps indisponível. Adicione VITE_GOOGLE_MAPS_API_KEY no arquivo .env ou nas variáveis da Vercel.",
+        ),
+      );
+      return;
+    }
+
+    if (window.google?.maps) {
+      resolve(window.google.maps);
       return;
     }
 
     const callbackName = "__initTerritorioMaps";
     (window as unknown as Record<string, unknown>)[callbackName] = () => {
+      delete (window as unknown as Record<string, unknown>)[callbackName];
       resolve(window.google.maps);
     };
 
     const script = document.createElement("script");
     script.src =
-      `https://maps.googleapis.com/maps/api/js?key=${key}` +
-      `&loading=async&libraries=geometry&language=pt-BR&region=BR` +
+      `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}` +
+      `&loading=async&libraries=geometry,places&language=pt-BR&region=BR` +
       `&callback=${callbackName}` +
-      (channel ? `&channel=${channel}` : "");
+      (channel ? `&channel=${encodeURIComponent(channel)}` : "");
     script.async = true;
-    script.onerror = () => reject(new Error("Falha ao carregar o Google Maps"));
+    script.onerror = () => {
+      delete (window as unknown as Record<string, unknown>)[callbackName];
+      script.remove();
+      loadPromise = null;
+      reject(new Error("Falha ao carregar a biblioteca do Google Maps. Verifique sua chave de API e restrições de domínio."));
+    };
     document.head.appendChild(script);
   });
 
@@ -47,6 +70,8 @@ export type TerritoryStatus = keyof typeof STATUS_META;
 
 export type Territory = {
   id: string;
+  user_id: string;
+  owned: boolean;
   name: string;
   status: TerritoryStatus;
   notes: string | null;
@@ -55,5 +80,4 @@ export type Territory = {
   folder_id?: string | null;
 };
 
-export type TerritoryFolder = { id: string; name: string };
-
+export type TerritoryFolder = { id: string; user_id: string; name: string; owned: boolean };

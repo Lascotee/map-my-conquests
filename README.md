@@ -1,26 +1,76 @@
-# Map My Regions
+# 🗺️ Territórios — Map My Conquests
 
-Quero criar um site para eu utilizar pra mapear regiões no google maps em que eu já dominei, tipo um bairro eu seleciono ele e ele ficar marcado como se eu tivesse visto todas as lojas da região, quero monitorar igual no google maps
+Plataforma completa de inteligência e gestão territorial com mapas interativos, contornos oficiais do IBGE, rastreamento de comércios (leads) e disparo comercial via WhatsApp.
 
-This project was built with [Lovable](https://lovable.dev).
+---
 
-**Live app**: https://map-my-conquests.lovable.app
+## ✨ Novidades & Destaques Visuais
+- **Fundo com Componente `<Radar />` (React Bits + WebGL)**: Animação fluida e interativa ao movimento do cursor do mouse, com estilo dark-mode cibernético de alta fidelidade.
+- **Integração Google Maps**: Suporte direto e flexível a qualquer chave de API do Google Maps (`VITE_GOOGLE_MAPS_API_KEY` ou `VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY`).
+- **Autenticação Supabase**: Login por e-mail/senha e Google OAuth com Row Level Security (RLS) protegendo todos os dados.
+- **Pronto para Deploy na Vercel**: Estrutura de arquivos configurada na raiz do projeto com zero fricção.
 
-## Build with Lovable
+---
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/9713ac3b-7086-4e55-88a5-b49382aaf38f).
+## 🚀 Como Rodar Localmente
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+### 1. Instalar dependências
+```bash
+npm install
+```
 
-## Development
+### 2. Configurar variáveis de ambiente
+Crie ou edite o arquivo `.env` na raiz do projeto:
+```env
+# Supabase
+VITE_SUPABASE_URL="https://seu-projeto.supabase.co"
+VITE_SUPABASE_PUBLISHABLE_KEY="sua_chave_publica_aqui"
+SUPABASE_URL="https://seu-projeto.supabase.co"
+SUPABASE_PUBLISHABLE_KEY="sua_chave_publica_aqui"
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+# Google Maps (Navegador e Servidor)
+VITE_GOOGLE_MAPS_API_KEY="AIzaSy..."
+GOOGLE_MAPS_API_KEY="AIzaSy..."
+```
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+### 3. Iniciar o servidor de desenvolvimento
+```bash
 npm run dev
 ```
+Acesse no seu navegador: **`http://localhost:3000`**
+
+---
+
+## ☁️ Como Fazer Deploy na Vercel
+
+O projeto já está 100% configurado para a Vercel com `vercel.json` e scripts prontos:
+
+1. Suba o código para o seu repositório no **GitHub / GitLab / Bitbucket**.
+2. Acesse [vercel.com/new](https://vercel.com/new) e importe o repositório.
+3. Nas configurações do projeto na Vercel (**Environment Variables**), adicione:
+   - `VITE_SUPABASE_URL`: sua URL do Supabase
+   - `VITE_SUPABASE_PUBLISHABLE_KEY`: sua chave pública do Supabase
+   - `SUPABASE_URL`: sua URL do Supabase
+   - `SUPABASE_PUBLISHABLE_KEY`: sua chave pública do Supabase
+   - `VITE_GOOGLE_MAPS_API_KEY`: sua chave do Google Maps (com APIs Maps JavaScript, Geocoding e Places habilitadas)
+   - `GOOGLE_MAPS_API_KEY`: sua chave do Google Maps
+4. Clique em **Deploy**. O projeto será compilado e publicado automaticamente!
+
+---
+
+## 🗄️ Configuração do Banco de Dados (Supabase)
+
+Caso queira configurar ou validar o seu projeto no Supabase do zero:
+1. Abra o painel do seu projeto no **[Supabase](https://supabase.com)**.
+2. Vá em **SQL Editor**.
+3. Copie todo o conteúdo do arquivo [`supabase/full_schema.sql`](supabase/full_schema.sql) e clique em **Run**.
+4. Isso criará automaticamente todas as tabelas (`territories`, `leads`, `territory_folders`, `category_presets`, etc.) com todas as regras de segurança RLS ativas!
+
+---
+
+## 🛠️ Scripts Disponíveis
+
+- `npm run dev`: Inicia o servidor local de desenvolvimento.
+- `npm run build`: Compila a aplicação para produção.
+- `npm run typecheck`: Executa a verificação estática do TypeScript.
+- `npm run preview`: Visualiza o build de produção localmente.

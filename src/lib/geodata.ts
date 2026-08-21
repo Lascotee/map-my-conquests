@@ -25,7 +25,13 @@ export const LEVEL_META: Record<
   Level,
   { label: string; codeProp: string; nameProp: string; sourceYear: number; perUf: boolean }
 > = {
-  regioes: { label: "Região", codeProp: "CD_REGIAO", nameProp: "NM_REGIAO", sourceYear: 2025, perUf: false },
+  regioes: {
+    label: "Região",
+    codeProp: "CD_REGIAO",
+    nameProp: "NM_REGIAO",
+    sourceYear: 2025,
+    perUf: false,
+  },
   ufs: { label: "Estado", codeProp: "CD_UF", nameProp: "NM_UF", sourceYear: 2025, perUf: false },
   regioes_intermediarias: {
     label: "Região intermediária",
@@ -41,8 +47,20 @@ export const LEVEL_META: Record<
     sourceYear: 2025,
     perUf: false,
   },
-  municipios: { label: "Município", codeProp: "CD_MUN", nameProp: "NM_MUN", sourceYear: 2025, perUf: true },
-  distritos: { label: "Distrito", codeProp: "CD_DIST", nameProp: "NM_DIST", sourceYear: 2022, perUf: true },
+  municipios: {
+    label: "Município",
+    codeProp: "CD_MUN",
+    nameProp: "NM_MUN",
+    sourceYear: 2025,
+    perUf: true,
+  },
+  distritos: {
+    label: "Distrito",
+    codeProp: "CD_DIST",
+    nameProp: "NM_DIST",
+    sourceYear: 2022,
+    perUf: true,
+  },
   subdistritos: {
     label: "Subdistrito",
     codeProp: "CD_SUBDIST",
@@ -50,7 +68,13 @@ export const LEVEL_META: Record<
     sourceYear: 2022,
     perUf: true,
   },
-  bairros: { label: "Bairro", codeProp: "CD_BAIRRO", nameProp: "NM_BAIRRO", sourceYear: 2022, perUf: true },
+  bairros: {
+    label: "Bairro",
+    codeProp: "CD_BAIRRO",
+    nameProp: "NM_BAIRRO",
+    sourceYear: 2022,
+    perUf: true,
+  },
 };
 
 export const DATA_SOURCE = "IBGE — malhas territoriais";
@@ -58,8 +82,20 @@ export const DATA_SOURCE = "IBGE — malhas territoriais";
 /* ---------- índices ---------- */
 
 export type RegiaoIndex = { code: string; name: string; abbr: string; source_year: number };
-export type UfIndex = { code: string; name: string; abbr: string; region_code: string; source_year: number };
-export type RgIntIndex = { code: string; name: string; uf_code: string; region_code: string; source_year: number };
+export type UfIndex = {
+  code: string;
+  name: string;
+  abbr: string;
+  region_code: string;
+  source_year: number;
+};
+export type RgIntIndex = {
+  code: string;
+  name: string;
+  uf_code: string;
+  region_code: string;
+  source_year: number;
+};
 export type RgiIndex = {
   code: string;
   name: string;
@@ -220,7 +256,20 @@ export function bboxOf(features: GeoFeature[]): BBox | null {
   return [minX, minY, maxX, maxY];
 }
 
-/** Converte o anel externo da maior parte da feature em caminho lat/lng. */
+function ringArea(ring: number[][]): number {
+  let area = 0;
+  for (let i = 0, previous = ring.length - 1; i < ring.length; previous = i++) {
+    const currentPoint = ring[i];
+    const previousPoint = ring[previous];
+    if (!currentPoint || !previousPoint) continue;
+    area +=
+      (previousPoint[0] ?? 0) * (currentPoint[1] ?? 0) -
+      (currentPoint[0] ?? 0) * (previousPoint[1] ?? 0);
+  }
+  return Math.abs(area / 2);
+}
+
+/** Converte o maior anel externo da feature em caminho lat/lng. */
 export function featureToPath(feature: GeoFeature): { lat: number; lng: number }[] {
   const geom = feature.geometry;
   const rings: number[][][] =
@@ -228,7 +277,14 @@ export function featureToPath(feature: GeoFeature): { lat: number; lng: number }
       ? [(geom.coordinates as number[][][])[0] ?? []]
       : (geom.coordinates as number[][][][]).map((poly) => poly[0] ?? []);
   let best: number[][] = [];
-  for (const r of rings) if (r.length > best.length) best = r;
+  let bestArea = -1;
+  for (const ring of rings) {
+    const area = ringArea(ring);
+    if (area > bestArea) {
+      best = ring;
+      bestArea = area;
+    }
+  }
   return best
     .filter((c) => Array.isArray(c) && c.length >= 2)
     .map((c) => ({ lat: c[1]!, lng: c[0]! }));
